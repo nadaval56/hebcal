@@ -134,7 +134,9 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   min-height: 0; padding: 5px 3px; display: flex; flex-direction: column;
   align-items: center; justify-content: center; position: relative; overflow: hidden;
   border-bottom: 1px solid var(--line-soft);
+  border-inline-end: 1px solid var(--line-soft);
 }
+.cell:nth-child(7n) { border-inline-end: 0; }
 .cell { background: var(--cell); }
 .cell.shabbat { background: var(--shabbat); }
 .cell.sel { background: var(--accent-soft); }
@@ -250,7 +252,14 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .setting { display: flex; align-items: center; gap: 12px; padding: 11px 15px; border-bottom: 1px solid var(--line-soft); width: 100%; text-align: start; }
 .setting:last-child { border-bottom: 0; }
 .setting .txt { flex: 1; }
-.setting .t { font-size: 14.5px; }
+.setting .t { font-size: 14.5px; display: flex; align-items: center; gap: 6px; }
+.setting .info {
+  width: 17px; height: 17px; border-radius: 50%; flex: none;
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 11px; font-weight: 700; line-height: 17px; text-align: center;
+}
+.setting .info:active { background: var(--accent); color: var(--on-accent); }
+.setting .s { max-width: 100%; }
 .setting .s { font-size: 12px; color: var(--muted); }
 .setting select { width: auto; min-width: 145px; max-width: 58%; }
 .switch { width: 44px; height: 26px; border-radius: 999px; background: var(--line); position: relative; transition: background .2s; flex: none; }
@@ -306,7 +315,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   }
   .pr-table td { border: .4pt solid #c8c8c8; vertical-align: top; padding: 1.5mm 1.8mm; height: 28mm; width: 14.28%; }
   .pr-table td.sh { background: #f4f4f2; }
-  .pr-table td.out, .pr-table td.out .pr-h { color: #adadad; }
+  .pr-table td.out, .pr-table td.out .pr-h,
+  .pr-table td.out .pr-g, .pr-table td.out .pr-l { color: #bcbcbc; }
   .pr-top { display: flex; justify-content: space-between; align-items: baseline; }
   .pr-h { font-size: 15pt; font-weight: 700; line-height: 1; }
   .pr-g { font-size: 8.5pt; color: #666; }

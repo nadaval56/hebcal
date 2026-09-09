@@ -1,7 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="113" fill="#f4f2ec"/>
-  <g fill="none" stroke="#c96442" stroke-width="28" stroke-linejoin="round">
-    <path d="M256 103 123 333h266z"/>
-    <path d="M256 409 123 179h266z"/>
-  </g>
+    <rect x="85.8" y="131.0" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="176.2" y="131.0" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="266.8" y="131.0" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="357.2" y="131.0" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="85.8" y="221.5" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="176.2" y="221.5" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="266.8" y="221.5" width="69.0" height="69.0" rx="20.7" fill="#c96442"/>
+    <rect x="357.2" y="221.5" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="85.8" y="312.0" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="176.2" y="312.0" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="266.8" y="312.0" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
+    <rect x="357.2" y="312.0" width="69.0" height="69.0" rx="20.7" fill="#1f1e1d" opacity=".3"/>
 </svg>
