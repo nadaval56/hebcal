@@ -184,6 +184,18 @@
     });
   }
 
+  /** שתי ספירות העומר: זו שנספרה אמש וזו שייספרו הערב */
+  function omerBlock(omer) {
+    if (!omer || (!omer.day && !omer.tonight)) return '';
+    var html = '<div class="dc-omer">';
+    if (omer.day) html += '<div class="now">' + esc(Holidays.omerText(omer.day)) + '</div>';
+    if (omer.tonight) {
+      html += '<div class="ev"><span>הערב נספור</span> ' +
+        esc(Holidays.omerText(omer.tonight)) + '</div>';
+    }
+    return html + '</div>';
+  }
+
   function renderDayCard() {
     var h = HDate.make(state.sel);
     var info = Holidays.forDate(h, S.israel);
@@ -207,7 +219,7 @@
       '<div class="dc-greg">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
       '</div>' + (par ? '<div class="dc-par">' + esc(par) + '</div>' : '') + '</div>' +
       (tags.length ? '<div class="dc-tags">' + tags.join('') + '</div>' : '') +
-      (info.omer ? '<div class="dc-omer">' + esc(Holidays.omerText(info.omer)) + '</div>' : '') +
+      omerBlock(info.omer) +
       '<button class="dc-times" id="go-zman">' +
       '<span class="t"><span class="k">הנץ החמה</span><br><span class="v">' + fmtTime(z.sunrise) + '</span></span>' +
       '<span class="t"><span class="k">שקיעה</span><br><span class="v">' + fmtTime(z.sunset) + '</span></span>' +
@@ -360,7 +372,8 @@
     var lines = [];
     if (info.items.length) lines.push(info.items.map(function (i) { return i.name; }).join(' · '));
     if (info.special) lines.push(info.special);
-    if (info.omer) lines.push(Holidays.omerText(info.omer));
+    if (info.omer.day) lines.push(Holidays.omerText(info.omer.day));
+    if (info.omer.tonight) lines.push('הערב נספור: ' + Holidays.omerText(info.omer.tonight));
     if (info.candles) lines.push(candleText(info.candles));
     if (info.mevarchim) lines.push(HDate.moladText(h.hy, Holidays.nextMonth(h.hm, h.hy)));
     $('#conv-result').innerHTML =
