@@ -187,19 +187,16 @@
     var h = HDate.make(state.sel);
     var info = Holidays.forDate(h, S.israel);
     var z = Zmanim.compute(h.date, loc(), zopts());
-    var up = Holidays.upcomingShabbat(state.sel, S.israel);
-
     var tags = [];
     info.items.forEach(function (it) {
       var cls = it.kind === 'yomtov' ? ' yomtov' : it.kind === 'fast' ? ' fast' : '';
       tags.push('<span class="tag' + cls + '">' + esc(it.name) + '</span>');
     });
     if (info.special) tags.push('<span class="tag">' + esc(info.special) + '</span>');
-    if (info.omer) tags.push('<span class="tag">' + esc('עומר: יום ' + info.omer) + '</span>');
     if (info.candles) tags.push('<span class="tag">' + esc(candleText(info.candles)) + '</span>');
     if (info.mevarchim) tags.push('<span class="tag">' + esc(HDate.moladText(h.hy, Holidays.nextMonth(h.hm, h.hy))) + '</span>');
 
-    var par = info.parasha ? ('פרשת ' + info.parasha.name) : (up ? up.label : '');
+    var par = info.parasha ? ('פרשת ' + info.parasha.name) : '';
     var third = h.dow === 5 ? ['הדלקת נרות', z.candles]
       : h.dow === 6 ? ['צאת השבת', z.tzeitShabbat] : ['צאת הכוכבים', z.tzeit];
 
@@ -209,6 +206,7 @@
       '<div class="dc-greg">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
       '</div>' + (par ? '<div class="dc-par">' + esc(par) + '</div>' : '') + '</div>' +
       (tags.length ? '<div class="dc-tags">' + tags.join('') + '</div>' : '') +
+      (info.omer ? '<div class="dc-omer">' + esc(Holidays.omerText(info.omer)) + '</div>' : '') +
       '<button class="dc-times" id="go-zman">' +
       '<span class="t"><span class="k">הנץ החמה</span><br><span class="v">' + fmtTime(z.sunrise) + '</span></span>' +
       '<span class="t"><span class="k">שקיעה</span><br><span class="v">' + fmtTime(z.sunset) + '</span></span>' +
@@ -358,14 +356,12 @@
     $('#conv-greg').value = h.gy + '-' + String(h.gm).padStart(2, '0') + '-' + String(h.gd).padStart(2, '0');
     fillHebSelects(h.hy, h.hm, h.hd);
     var info = Holidays.forDate(h, S.israel);
-    var up = Holidays.upcomingShabbat(convAbs, S.israel);
     var lines = [];
     if (info.items.length) lines.push(info.items.map(function (i) { return i.name; }).join(' · '));
     if (info.special) lines.push(info.special);
     if (info.omer) lines.push(Holidays.omerText(info.omer));
     if (info.candles) lines.push(candleText(info.candles));
     if (info.mevarchim) lines.push(HDate.moladText(h.hy, Holidays.nextMonth(h.hm, h.hy)));
-    if (up) lines.push(up.label);
     $('#conv-result').innerHTML =
       '<div class="big">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
       '<div class="sub">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + h.gd + ' ב' + HDate.GREG_MONTHS[h.gm - 1] + ' ' + h.gy) + '</div>' +
