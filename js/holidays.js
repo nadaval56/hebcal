@@ -162,6 +162,7 @@ var Holidays = (function (H) {
         if (hd === 21) add('הושענא רבה', 'cholhamoed');
         if (hd === 22) add(israel ? 'שמיני עצרת · שמחת תורה' : 'שמיני עצרת', 'yomtov');
         if (hd === 23 && !israel) add('שמחת תורה', 'yomtov');
+        if (hd === (israel ? 23 : 24)) add('אסרו חג', 'minor');
         break;
       case 9: // כסלו
         if (hd === 24) add('ערב חנוכה', 'erev');
@@ -199,6 +200,7 @@ var Holidays = (function (H) {
       if (hd >= 17 && hd <= 20) add('חול המועד פסח', 'cholhamoed');
       if (hd === 21) add('שביעי של פסח', 'yomtov');
       if (hd === 22 && !israel) add('אחרון של פסח', 'yomtov');
+      if (hd === (israel ? 22 : 23)) add('אסרו חג', 'minor');
       // יום הזיכרון לשואה ולגבורה
       if (hd === 27 && d !== 5 && d !== 0) add('יום הזיכרון לשואה ולגבורה', 'modern');
       if (hd === 26 && d === 4) add('יום הזיכרון לשואה ולגבורה', 'modern');
@@ -218,6 +220,7 @@ var Holidays = (function (H) {
       if (hd === 5) add('ערב שבועות', 'erev');
       if (hd === 6) add('שבועות', 'yomtov');
       if (hd === 7 && !israel) add('שבועות — יום ב׳', 'yomtov');
+      if (hd === (israel ? 7 : 8)) add('אסרו חג', 'minor');
     }
 
     if (hm === 4) { // תמוז

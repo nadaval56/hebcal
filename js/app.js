@@ -2,6 +2,7 @@
 (function () {
   'use strict';
 
+  var APP_VERSION = '1.2.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -450,7 +451,7 @@
       'לוח · לוח שנה עברי וזמני היום<br>' +
       'כל החישובים מתבצעים במכשיר — ללא שרת, ללא מעקב וללא פרסומות.<br>' +
       'ניתן להוסיף למסך הבית ולעבוד גם ללא חיבור לאינטרנט.<br>' +
-      '<span style="opacity:.6">גרסה 1.0</span>';
+      '<span style="opacity:.6">גרסה ' + APP_VERSION + '</span>';
   }
 
   /* ================= חלון בחירת מיקום ================= */
@@ -660,7 +661,7 @@
     }
     document.documentElement.dataset.theme = t;
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#0d0d0c' : '#1a1a19');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#1c1b19' : '#f4f2ec');
   }
 
   function renderLocLabel() {
@@ -672,6 +673,36 @@
     if (state.view === 'zman') renderZman();
     if (state.view === 'conv') renderConv();
     if (state.view === 'set') renderSettings();
+  }
+
+  /* ================= עדכוני גרסה ================= */
+  /** רישום ה־Service Worker, בדיקת עדכון בכל פתיחה, ורענון אוטומטי כשמגיעה גרסה חדשה */
+  function setupUpdates() {
+    if (!('serviceWorker' in navigator)) return;
+    var hadController = !!navigator.serviceWorker.controller;
+    var reloading = false;
+
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      // גרסה חדשה השתלטה — רענון פעם אחת בלבד, ורק אם כבר הייתה גרסה מותקנת
+      if (reloading || !hadController) return;
+      reloading = true;
+      location.reload();
+    });
+
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(function (reg) {
+        reg.update().catch(function () { });
+        // בדיקת עדכון בכל חזרה לאפליקציה, לכל היותר פעם בחמש דקות
+        var last = 0;
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState !== 'visible') return;
+          var now = Date.now();
+          if (now - last < 300000) return;
+          last = now;
+          reg.update().catch(function () { });
+        });
+      })
+      .catch(function () { });
   }
 
   /* ================= אתחול ================= */
@@ -739,11 +770,7 @@
       if (t !== initDay) { initDay = t; state.sel = t; state.zman = t; resetAnchor(t); renderAll(); }
     }, 60000);
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('sw.js').catch(function () { });
-      });
-    }
+    setupUpdates();
   }
   var initDay = todayAbs();
 
