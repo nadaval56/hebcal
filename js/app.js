@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.8.1';
+  var APP_VERSION = '1.9.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -171,8 +171,9 @@
     if (!w || !rows) return;
     var col = w / 7;
     var avail = $('#view-cal').clientHeight - $('.month-nav').offsetHeight - $('.weekdays').offsetHeight;
+    var floor = window.innerHeight <= 720 ? MIN_CELL_H - 4 : MIN_CELL_H;
     var h = Math.min(col * CELL_RATIO, (avail - CARD_MAX_H) / rows);
-    h = Math.max(h, MIN_CELL_H);                      // שמירה על קריאות התא
+    h = Math.max(h, floor);                           // שמירה על קריאות התא
     h = Math.min(h, (avail - MIN_CARD_H) / rows);     // ובכל זאת בלי גלילה במסך
     grid.style.setProperty('--row-h', Math.floor(Math.max(h, 34)) + 'px');
   }
@@ -224,25 +225,37 @@
     var h = HDate.make(state.sel);
     var info = Holidays.forDate(h, S.israel);
     var z = Zmanim.compute(h.date, loc(), zopts());
+    // התווית הראשית מוצגת לצד התאריך ולא בשורה נפרדת, כדי לחסוך גובה
+    var sorted = info.items.slice().sort(function (a, b) {
+      return (KIND_RANK[a.kind] || 9) - (KIND_RANK[b.kind] || 9);
+    });
+    var lead = sorted.length ? sorted[0] : null;
+    var rest = lead ? sorted.slice(1) : [];
+
+    var meta = '';
+    if (info.parasha) meta += '<div class="dc-par">' + esc('פרשת ' + info.parasha.name) + '</div>';
+    if (lead) {
+      meta += '<div class="dc-holiday' + (lead.kind === 'fast' ? ' fast' : lead.kind === 'yomtov' ? ' yomtov' : '') +
+        '">' + esc(lead.name) + '</div>';
+    }
+
     var tags = [];
-    info.items.forEach(function (it) {
-      var cls = it.kind === 'yomtov' ? ' yomtov' : it.kind === 'fast' ? ' fast' : '';
-      tags.push('<span class="tag' + cls + '">' + esc(it.name) + '</span>');
+    rest.forEach(function (it) {
+      tags.push('<span class="tag' + (it.kind === 'fast' ? ' fast' : '') + '">' + esc(it.name) + '</span>');
     });
     if (info.special) tags.push('<span class="tag">' + esc(info.special) + '</span>');
     if (info.candles) tags.push('<span class="tag">' + esc(candleText(info.candles)) + '</span>');
     if (info.mevarchim) tags.push('<span class="tag">' + esc(HDate.moladText(h.hy, Holidays.nextMonth(h.hm, h.hy))) + '</span>');
 
-    var par = info.parasha ? ('פרשת ' + info.parasha.name) : '';
     var third = h.dow === 5 ? ['הדלקת נרות', z.candles]
       : h.dow === 6 ? ['צאת השבת', z.tzeitShabbat] : ['צאת הכוכבים', z.tzeit];
 
     $('#daycard').innerHTML =
       '<div class="dc-body">' +
-      '<div class="dc-head"><div>' +
+      '<div class="dc-head"><div class="dc-when">' +
       '<div class="dc-date">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
       '<div class="dc-greg">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
-      '</div>' + (par ? '<div class="dc-par">' + esc(par) + '</div>' : '') + '</div>' +
+      '</div>' + (meta ? '<div class="dc-meta">' + meta + '</div>' : '') + '</div>' +
       (tags.length ? '<div class="dc-tags">' + tags.join('') + '</div>' : '') +
       omerBlock(info.omer) +
       '</div>' +
