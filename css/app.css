@@ -418,7 +418,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 26px 16px; }
 .foot { text-align: center; color: var(--muted); font-size: 11.5px; padding: 14px 16px 20px; line-height: 1.6; }
-#events-note { text-align: start; padding: 8px 20px 0; }
+/* הסבר האחסון יושב מתחת לכותרת המדור ולפני המתגים — נקרא לפני שנוגעים בהם */
+#events-note { text-align: start; padding: 0 20px 2px; }
 
 /* ===== תצוגת הדפסה ===== */
 #print-area { display: none; }
