@@ -1,6 +1,6 @@
 /* sw.js — מטמון לעבודה ללא אינטרנט, עם עדכון כפוי בכל טעינה מקוונת.
    כשמתפרסמת גרסה חדשה באתר, המכשיר מקבל אותה מיד — בלי מטמון תקוע. */
-var VERSION = '1.7.0';
+var VERSION = '1.8.0';
 var CACHE = 'luach-' + VERSION;
 var ASSETS = [
   './', 'index.html', 'css/app.css',
