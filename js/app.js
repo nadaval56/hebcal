@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.6.0';
+  var APP_VERSION = '1.7.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -155,6 +155,28 @@
     };
   }
 
+  var MIN_CARD_H = 132;   // גובה מזערי לכרטיס היום
+  var CARD_RESERVE = 190; // מקום קבוע שנשמר לכרטיס, ללא תלות בתוכנו
+  var RATIO_MIN = 1.10;   // גובה שורה מזערי ביחס לרוחב העמודה
+  var RATIO_MAX = 1.45;   // וגובה מרבי, כדי שהתא יישאר ריבועי למדי
+
+  /**
+   * קובע את גובה שורות הלוח לפי רוחב העמודה והמקום הפנוי בלבד.
+   * המקום שנשמר לכרטיס היום הוא קבוע, ולכן כמות הטקסט בכרטיס אינה
+   * משפיעה על גובה השורות, והוא נשאר זהה בכל ימי החודש.
+   */
+  function sizeGrid(rows) {
+    var grid = $('#grid');
+    var w = grid.clientWidth;
+    if (!w || !rows) return;
+    var col = w / 7;
+    var avail = $('#view-cal').clientHeight - $('.month-nav').offsetHeight - $('.weekdays').offsetHeight;
+    var fill = (avail - CARD_RESERVE) / rows;
+    var h = Math.max(col * RATIO_MIN, Math.min(col * RATIO_MAX, fill));
+    h = Math.min(h, (avail - MIN_CARD_H) / rows);
+    grid.style.setProperty('--row-h', Math.floor(Math.max(h, 34)) + 'px');
+  }
+
   function renderMonthTitle() {
     var t = monthTitleParts();
     $('#month-title').innerHTML = '<div class="heb">' + esc(t.heb) + '</div>' +
@@ -165,8 +187,10 @@
     renderMonthTitle();
     var grid = $('#grid');
     grid.innerHTML = '';
+    var cells = monthCells();
+    sizeGrid(cells.length / 7);
     var tAbs = todayAbs();
-    monthCells().forEach(function (c) {
+    cells.forEach(function (c) {
       var h = HDate.make(c.abs);
       var info = Holidays.forDate(h, S.israel);
       var labels = dayLabels(info);
@@ -214,12 +238,14 @@
       : h.dow === 6 ? ['צאת השבת', z.tzeitShabbat] : ['צאת הכוכבים', z.tzeit];
 
     $('#daycard').innerHTML =
+      '<div class="dc-body">' +
       '<div class="dc-head"><div>' +
       '<div class="dc-date">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
       '<div class="dc-greg">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
       '</div>' + (par ? '<div class="dc-par">' + esc(par) + '</div>' : '') + '</div>' +
       (tags.length ? '<div class="dc-tags">' + tags.join('') + '</div>' : '') +
       omerBlock(info.omer) +
+      '</div>' +
       '<button class="dc-times" id="go-zman">' +
       '<span class="t"><span class="k">הנץ החמה</span><br><span class="v">' + fmtTime(z.sunrise) + '</span></span>' +
       '<span class="t"><span class="k">שקיעה</span><br><span class="v">' + fmtTime(z.sunset) + '</span></span>' +
@@ -848,6 +874,10 @@
         d = Math.min(d, HDate.daysInMonth(m, y));
         convAbs = HDate.hebToAbs(y, m, d); renderConv();
       });
+    });
+
+    window.addEventListener('resize', function () {
+      sizeGrid(monthCells().length / 7);
     });
 
     // החלקה בין חודשים
