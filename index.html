@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>לוח — לוח שנה עברי וזמני היום</title>
 <meta name="description" content="לוח שנה עברי־לועזי וזמני היום, ללא פרסומות וללא אינטרנט. עובד כאפליקציה על מסך הבית.">
-<meta name="theme-color" content="#17203a">
+<meta name="theme-color" content="#1a1a19">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -38,7 +38,7 @@
 <div id="app">
   <header class="topbar">
     <div class="topbar-inner">
-      <button class="icon-btn" id="btn-today" title="מיקום"><svg><use href="#i-pin"/></svg></button>
+      <button class="loc-btn" id="btn-loc" title="מיקום"><svg><use href="#i-pin"/></svg><span id="topbar-loc"></span></button>
       <h1 id="page-title">לוח</h1>
       <button class="pill" id="btn-jump">היום</button>
     </div>
@@ -57,7 +57,10 @@
       <div class="card daycard" id="daycard"></div>
       <div class="section-title">אירועים קרובים</div>
       <div class="card"><div class="list" id="upcoming"></div></div>
-      <div class="foot" id="foot-cal"></div>
+      <div class="actions">
+        <button id="act-mode"></button>
+        <button id="act-print"><svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4v-6h16v6h-2M8 14h8v7H8z"/></svg>הדפסת החודש</button>
+      </div>
     </section>
 
     <!-- זמני היום -->
@@ -72,7 +75,6 @@
           <div class="box"><div class="k"><svg><use href="#i-sun"/></svg>הנץ החמה</div><div class="v" id="z-sunrise">--:--</div></div>
           <div class="box"><div class="k"><svg><use href="#i-moon"/></svg>שקיעה</div><div class="v" id="z-sunset">--:--</div></div>
         </div>
-        <div class="shabbat-strip" id="z-shabbat"></div>
       </div>
       <div class="countdown" id="z-countdown"></div>
       <button class="loc-chip" id="z-loc">
@@ -109,11 +111,11 @@
       <div class="card">
         <button class="setting" id="set-loc" style="width:100%;text-align:start">
           <div class="txt"><div class="t" id="set-loc-name"></div><div class="s" id="set-loc-sub"></div></div>
-          <svg class="icon-btn" style="width:20px;height:20px;stroke:var(--gold);fill:none;stroke-width:1.8"><use href="#i-prev"/></svg>
+          <svg class="icon-btn" style="width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.8"><use href="#i-prev"/></svg>
         </button>
         <button class="setting" id="set-gps" style="width:100%;text-align:start">
           <div class="txt"><div class="t">איתור אוטומטי</div><div class="s">שימוש ב־GPS של המכשיר</div></div>
-          <svg class="icon-btn" style="width:20px;height:20px;stroke:var(--gold);fill:none;stroke-width:1.8"><use href="#i-gps"/></svg>
+          <svg class="icon-btn" style="width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.8"><use href="#i-gps"/></svg>
         </button>
       </div>
 
@@ -143,6 +145,8 @@
     <div class="sheet-body" id="sheet-body"></div>
   </div>
 </div>
+
+<div id="print-area"></div>
 
 <script src="js/hdate.js"></script>
 <script src="js/zmanim.js"></script>
