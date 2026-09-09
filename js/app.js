@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.9.0';
+  var APP_VERSION = '1.9.1';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -155,6 +155,7 @@
     };
   }
 
+  var denseLabels = false; // בתאים נמוכים אין מקום לשתי תוויות
   var MIN_CARD_H = 132;   // גובה מזערי לכרטיס היום
   var CARD_MAX_H = 274;   // גובה הכרטיס ביום העמוס ביותר (ספירת העומר עם תגיות)
   var MIN_CELL_H = 50;    // גובה תא מזערי שבו התוכן עדיין נכנס
@@ -175,7 +176,11 @@
     var h = Math.min(col * CELL_RATIO, (avail - CARD_MAX_H) / rows);
     h = Math.max(h, floor);                           // שמירה על קריאות התא
     h = Math.min(h, (avail - MIN_CARD_H) / rows);     // ובכל זאת בלי גלילה במסך
-    grid.style.setProperty('--row-h', Math.floor(Math.max(h, 34)) + 'px');
+    h = Math.floor(Math.max(h, 34));
+    grid.style.setProperty('--row-h', h + 'px');
+    // שתי תוויות דורשות שתי שורות טקסט מעל האות והתאריך; אם אין להן מקום,
+    // עדיף להציג אחת מלאה מאשר שתיים שנדרסות זו על זו.
+    denseLabels = h < 55;
   }
 
   function renderMonthTitle() {
@@ -195,6 +200,7 @@
       var h = HDate.make(c.abs);
       var info = Holidays.forDate(h, S.israel);
       var labels = dayLabels(info);
+      if (denseLabels) labels = labels.slice(0, 1);
       var cell = el('div', 'cell' + (c.out ? ' out' : '') + (h.dow === 6 ? ' shabbat' : '') +
         (c.abs === tAbs ? ' today' : '') + (c.abs === state.sel ? ' sel' : '') +
         (labels.length > 1 ? ' multi' : ''));
@@ -889,9 +895,7 @@
       });
     });
 
-    window.addEventListener('resize', function () {
-      sizeGrid(monthCells().length / 7);
-    });
+    window.addEventListener('resize', function () { renderGrid(); });
 
     // החלקה בין חודשים
     var x0 = null, y0 = null;
