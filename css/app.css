@@ -193,6 +193,16 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 }
 .cell .lbl.fast { color: var(--fast); }
 .cell .lbl.par { color: var(--muted); font-weight: 400; }
+/* אירוע אישי — טקסט חופשי, ולכן מותר לו להישבר בתוך מילה ולא להיחתך לרוחב */
+.cell .lbl.evt { color: var(--accent); font-weight: 600; overflow-wrap: anywhere; word-break: normal; }
+.cell.today .lbl.evt { color: var(--on-accent); }
+/* נקודה בפינת התא — רק כשתווית האירוע נדחקה החוצה מחמת מקום */
+.cell.evdot::after {
+  content: ''; position: absolute; top: 3px; inset-inline-start: 3px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+}
+.cell.today.evdot::after { background: var(--on-accent); opacity: .85; }
+.cell.out.evdot::after { opacity: .38; }
 .cell .lbl.long { font-size: calc(8.4px * var(--ls, 1)); letter-spacing: -.2px; }
 
 /* יום עם שתי תוויות: מצמצמים את שאר התא כדי שלשתי השורות יהיה מקום
@@ -262,6 +272,38 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 }
 .dc-omer .ev span { font-weight: 600; }
 .dc-omer .now + .ev { opacity: .9; }
+/* ===== אירועים אישיים ===== */
+/* שורה אחת שנגללת לרוחב, ולא שורה עוטפת: גובה שורת האירועים חייב להיות
+   קבוע ולא תלוי באורך התיאורים, אחרת ביום עמוס (למשל בימי ספירת העומר)
+   הכרטיס גבוה מן המקום שנשמר לו — והוא גולל בתוכו. */
+.dc-events {
+  display: flex; flex-wrap: nowrap; gap: 5px; margin-top: 8px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.dc-events::-webkit-scrollbar { display: none; }
+.tag.ev {
+  /* בלי flex:none השבבים נדחסים ברוחב במקום להיגלל */
+  flex: none; display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+  background: var(--accent-soft); color: var(--accent); border-color: transparent;
+}
+.tag.ev .tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16ch; }
+.tag.ev .hh { font-size: 11px; opacity: .75; font-variant-numeric: tabular-nums; }
+.tag.ev .pl { font-size: 13.5px; line-height: 1; font-weight: 600; }
+.tag.ev.more { background: var(--surface-2); color: var(--ink-2); border-color: var(--line-soft); }
+.tag.ev.add { background: var(--surface-2); color: var(--ink-2); border: 1px dashed var(--line); }
+.tag.ev:active { opacity: .55; }
+.btn-row { display: flex; gap: 10px; padding: 6px 12px 20px; }
+.btn-main {
+  flex: 1; padding: 12px; border-radius: var(--radius-sm);
+  background: var(--accent); color: var(--on-accent); font-size: 15px; font-weight: 600;
+}
+.btn-danger {
+  flex: none; padding: 12px 18px; border-radius: var(--radius-sm); background: var(--surface);
+  border: 1px solid var(--line); color: var(--fast); font-size: 15px; font-weight: 600;
+}
+.btn-main:active, .btn-danger:active { opacity: .6; }
+.row-del { flex: none; font-size: 12.5px; font-weight: 600; color: var(--fast); padding: 6px 2px; }
+
 .dc-times {
   flex: none; display: flex; align-items: center; gap: 4px; width: 100%; margin-top: 8px;
   padding: 8px 4px 0; border-top: 1px solid var(--line-soft); color: inherit;
@@ -321,7 +363,7 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .field label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
 .field .controls { display: flex; gap: 8px; }
 .field .controls select { flex: 1; min-width: 0; }
-input[type="date"], input[type="text"], select {
+input[type="date"], input[type="time"], input[type="text"], select {
   width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: var(--surface-2); font-size: 15px;
 }
@@ -402,6 +444,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   .pr-g { font-size: 8.5pt; color: #666; }
   .pr-l { font-size: 8pt; line-height: 1.3; margin-top: 1.4mm; }
   .pr-l.par { color: #444; }
+  .pr-l.ev { font-weight: 600; }
   .pr-foot { margin-top: 3mm; font-size: 8pt; color: #666; display: flex; justify-content: space-between; }
 }
 
@@ -409,6 +452,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 @media (max-height: 660px) {
   .daycard { padding: 8px 14px 10px; }
   .dc-tags { margin-top: 6px; }
+  .dc-events { margin-top: 6px; }
+  /* רק כשהאירועים דלוקים: במסך נמוך, ביום שיש בו גם ספירת עומר וגם
+     אירועים, אין די מקום לכרטיס — ואז הוא נדחס וגולל בתוכו. ההידוק חל
+     על מי שהדליק את האפשרות בלבד. */
+  [data-events="1"] .dc-events { margin-top: 5px; }
+  [data-events="1"] .tag.ev { padding: 2px 8px; font-size: 11px; }
+  [data-events="1"] .dc-omer { font-size: 11px; padding: 4px 8px; line-height: 1.2; }
   .dc-omer { margin-top: 5px; }
   .dc-times { margin-top: 6px; padding-top: 6px; }
 }

@@ -38,13 +38,34 @@ if (ROOT.indexOf('file://') === 0) {
 var SIZES = [[393, 780], [393, 700], [393, 660], [360, 640], [412, 800], [430, 760]];
 var SCALES = [1, 1.15, 1.3];
 var MODES = ['heb', 'greg'];       // מצב חודש עברי נשכח בעבר ודווקא בו התגלתה התקלה
+var EVENTS = [false, true];        // אירועים אישיים מוסיפים תוכן קבוע לכרטיס ולתאים
 var MONTHS = 13;
 
-/** מפתח ההגדרות ב־localStorage. שם שגוי כאן מריץ את כל הבדיקה במצב הלוח הלועזי. */
-function setMode(mode) {
+/**
+ * מפתח ההגדרות ב־localStorage הוא `luach.settings`. שם שגוי כאן מריץ את כל
+ * הבדיקה במצב הלוח הלועזי. במצב האירועים נזרע גם `luach.events` במקרה הגרוע:
+ * אירועים בכל יום, עד ארבעה ליום, עם תיאורים ארוכים.
+ */
+function setup(cfg) {
   var s = JSON.parse(localStorage.getItem('luach.settings') || '{}');
-  s.calMode = mode;
+  s.calMode = cfg.mode;
+  s.events = cfg.events;
   localStorage.setItem('luach.settings', JSON.stringify(s));
+  localStorage.removeItem('luach.events');
+  if (!cfg.events) return;
+  var texts = ['יום הולדת לסבתא רבתא', 'אזכרה', 'אסיפת הורים בבית הספר היסודי', 'תור'];
+  var o = {}, d = new Date();
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  d.setDate(d.getDate() - 45);
+  for (var i = 0; i < 520; i++) {
+    var a = [];
+    for (var j = 0; j <= i % 4; j++) {
+      a.push({ id: 'x' + i + '-' + j, text: texts[(i + j) % texts.length], time: j ? '' : '19:30' });
+    }
+    o[d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())] = a;
+    d.setDate(d.getDate() + 1);
+  }
+  localStorage.setItem('luach.events', JSON.stringify(o));
 }
 
 /** מדמה הגדלת טקסט במכשיר: מכפיל כל font-size בגיליונות הסגנון. */
@@ -117,12 +138,12 @@ function auditGrid() {
   };
 }
 
-function open(browser, w, h, mode) {
+function open(browser, w, h, mode, events) {
   return browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 })
     .then(function (ctx) {
       return ctx.newPage().then(function (p) {
         return p.goto(ROOT + '/index.html')
-          .then(function () { return p.evaluate(setMode, mode); })
+          .then(function () { return p.evaluate(setup, { mode: mode, events: events }); })
           .then(function () { return p.reload(); })
           .then(function () { return p.waitForTimeout(150); })
           .then(function () { return { ctx: ctx, page: p }; });
@@ -135,24 +156,26 @@ async function auditClipping(browser) {
   var checks = 0, bad = 0;
   for (const [w, h] of SIZES) {
     for (const mode of MODES) {
-      for (const k of SCALES) {
-        const { ctx, page } = await open(browser, w, h, mode);
-        await page.evaluate(scaleFonts, k);
-        await page.waitForTimeout(80);
-        for (let i = 0; i < MONTHS; i++) {
-          const r = await page.evaluate(auditGrid);
-          checks++;
-          if (r.bad.length || r.scroll > 1) {
-            bad++;
-            if (bad <= 12) {
-              console.log(`${w}x${h} ${mode} x${k} | ${r.title} [${r.cls}] ${r.row} ` +
-                `scroll=${r.scroll} | ${r.bad.slice(0, 3).join(' , ')}`);
+      for (const ev of EVENTS) {
+        for (const k of SCALES) {
+          const { ctx, page } = await open(browser, w, h, mode, ev);
+          await page.evaluate(scaleFonts, k);
+          await page.waitForTimeout(80);
+          for (let i = 0; i < MONTHS; i++) {
+            const r = await page.evaluate(auditGrid);
+            checks++;
+            if (r.bad.length || r.scroll > 1) {
+              bad++;
+              if (bad <= 12) {
+                console.log(`${w}x${h} ${mode}${ev ? '+אירועים' : ''} x${k} | ${r.title} ` +
+                  `[${r.cls}] ${r.row} scroll=${r.scroll} | ${r.bad.slice(0, 3).join(' , ')}`);
+              }
             }
+            await page.click('#m-next');
+            await page.waitForTimeout(45);
           }
-          await page.click('#m-next');
-          await page.waitForTimeout(45);
+          await ctx.close();
         }
-        await ctx.close();
       }
     }
   }
@@ -165,34 +188,40 @@ async function auditDays(browser) {
   var checks = 0, bad = 0;
   for (const [w, h] of [[393, 780], [393, 700], [360, 640]]) {
     for (const mode of MODES) {
-      const { ctx, page } = await open(browser, w, h, mode);
-      for (let m = 0; m < 14; m++) {
-        const n = await page.evaluate(function () {
-          return document.getElementById('grid').children.length;
-        });
-        for (let d = 0; d < n; d++) {
-          const r = await page.evaluate(function (d) {
-            document.getElementById('grid').children[d].click();
-            var body = document.querySelector('.dc-body');
-            return {
-              card: body.scrollHeight - body.clientHeight,
-              day: document.getElementById('grid').children[d].textContent
-                .trim().replace(/\s+/g, ' ').slice(0, 16),
-              title: document.getElementById('month-title').textContent.trim().slice(0, 16)
-            };
-          }, d);
-          checks++;
-          if (r.card > 1) {
-            bad++;
-            if (bad <= 10) {
-              console.log(`${w}x${h} ${mode} | ${r.title} | ${r.day} | גלילה בכרטיס: ${r.card}px`);
+      for (const ev of EVENTS) {
+        const { ctx, page } = await open(browser, w, h, mode, ev);
+        for (let m = 0; m < 14; m++) {
+          const n = await page.evaluate(function () {
+            return document.getElementById('grid').children.length;
+          });
+          for (let d = 0; d < n; d++) {
+            const r = await page.evaluate(function (d) {
+              document.getElementById('grid').children[d].click();
+              // לחיצה חוזרת על היום שנבחר פותחת חלון אירוע — סוגרים ומודדים
+              var close = document.querySelector('#sheet.open .close');
+              if (close) close.click();
+              var body = document.querySelector('.dc-body');
+              return {
+                card: body.scrollHeight - body.clientHeight,
+                day: document.getElementById('grid').children[d].textContent
+                  .trim().replace(/\s+/g, ' ').slice(0, 16),
+                title: document.getElementById('month-title').textContent.trim().slice(0, 16)
+              };
+            }, d);
+            checks++;
+            if (r.card > 1) {
+              bad++;
+              if (bad <= 10) {
+                console.log(`${w}x${h} ${mode}${ev ? '+אירועים' : ''} | ${r.title} | ` +
+                  `${r.day} | גלילה בכרטיס: ${r.card}px`);
+              }
             }
           }
+          await page.click('#m-next');
+          await page.waitForTimeout(40);
         }
-        await page.click('#m-next');
-        await page.waitForTimeout(40);
+        await ctx.close();
       }
-      await ctx.close();
     }
   }
   console.log(`כרטיס היום: ${checks} ימים נבדקו, ${bad} עם גלילה`);
