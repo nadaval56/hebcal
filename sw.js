@@ -1,27 +1,19 @@
-/* sw.js — שירות מטמון: האפליקציה עובדת גם ללא חיבור לאינטרנט */
-var CACHE = 'luach-v1';
+/* sw.js — מטמון לעבודה ללא אינטרנט, עם עדכון כפוי בכל טעינה מקוונת.
+   כשמתפרסמת גרסה חדשה באתר, המכשיר מקבל אותה מיד — בלי מטמון תקוע. */
+var VERSION = '1.2.0';
+var CACHE = 'luach-' + VERSION;
 var ASSETS = [
-  './',
-  'index.html',
-  'css/app.css',
-  'js/hdate.js',
-  'js/zmanim.js',
-  'js/holidays.js',
-  'js/cities.js',
-  'js/app.js',
-  'manifest.webmanifest',
-  'assets/icon.svg',
-  'assets/icon-192.png',
-  'assets/icon-512.png',
-  'assets/icon-180.png',
-  'assets/icon-maskable.png'
+  './', 'index.html', 'css/app.css',
+  'js/hdate.js', 'js/zmanim.js', 'js/holidays.js', 'js/cities.js', 'js/app.js',
+  'manifest.webmanifest', 'assets/icon.svg', 'assets/icon-192.png',
+  'assets/icon-512.png', 'assets/icon-180.png', 'assets/icon-maskable.png', 'assets/og.png'
 ];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return Promise.all(ASSETS.map(function (u) {
-        return c.add(u).catch(function () { });
+        return c.add(new Request(u, { cache: 'reload' })).catch(function () { });
       }));
     }).then(function () { return self.skipWaiting(); })
   );
@@ -37,39 +29,49 @@ self.addEventListener('activate', function (e) {
   );
 });
 
+/** מהרשת קודם: תמיד הגרסה העדכנית כשיש חיבור, ומהמטמון כשאין. */
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
-  // ניווט: מהמטמון קודם, עם רענון ברקע
-  if (req.mode === 'navigate') {
+
+  var url;
+  try { url = new URL(req.url); } catch (err) { return; }
+  var sameOrigin = url.origin === self.location.origin;
+
+  if (!sameOrigin) {
+    // גופנים וכדומה: מהמטמון קודם, רשת כגיבוי
     e.respondWith(
-      caches.match('index.html').then(function (hit) {
-        var net = fetch(req).then(function (res) {
-          caches.open(CACHE).then(function (c) { c.put('index.html', res.clone()); });
+      caches.match(req).then(function (hit) {
+        return hit || fetch(req).then(function (res) {
+          if (res && (res.ok || res.type === 'opaque')) {
+            var copy = res.clone();
+            caches.open(CACHE).then(function (c) { c.put(req, copy); });
+          }
           return res;
         }).catch(function () { return hit; });
-        return hit || net;
       })
     );
     return;
   }
+
+  var key = req.mode === 'navigate' ? 'index.html' : req;
   e.respondWith(
-    caches.match(req).then(function (hit) {
-      if (hit) {
-        fetch(req).then(function (res) {
-          if (res && res.status === 200) {
-            caches.open(CACHE).then(function (c) { c.put(req, res.clone()); });
-          }
-        }).catch(function () { });
-        return hit;
-      }
-      return fetch(req).then(function (res) {
-        if (res && (res.status === 200 || res.type === 'opaque')) {
+    fetch(new Request(url.href, { cache: 'no-cache', credentials: 'same-origin' }))
+      .then(function (res) {
+        if (res && res.ok) {
           var copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(req, copy); });
+          caches.open(CACHE).then(function (c) { c.put(key, copy); });
         }
         return res;
-      });
-    })
+      })
+      .catch(function () {
+        return caches.match(key).then(function (hit) {
+          return hit || caches.match('index.html');
+        });
+      })
   );
+});
+
+self.addEventListener('message', function (e) {
+  if (e.data === 'skipWaiting') self.skipWaiting();
 });

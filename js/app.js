@@ -2,6 +2,7 @@
 (function () {
   'use strict';
 
+  var APP_VERSION = '1.2.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -9,7 +10,7 @@
   /* ================= הגדרות ================= */
   var DEFAULTS = {
     locName: 'ירושלים', lat: 31.7683, lng: 35.2137, elevation: 754, tz: 'Asia/Jerusalem',
-    israel: true, theme: 'auto', calMode: 'greg', showParasha: true,
+    israel: true, theme: 'auto', calMode: 'greg', showParasha: true, isGps: false,
     alot: '72', misheyakir: '45', tzeit: '25', shabbatEnd: '35', candles: 40, useElevation: false
   };
   var S = load();
@@ -58,6 +59,22 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
+  /** עד שתי תוויות ליום: מועדים לפי חשיבות, ואז פרשה או שבת מיוחדת */
+  function dayLabels(info) {
+    var out = [];
+    info.items.slice().sort(function (a, b) {
+      return (KIND_RANK[a.kind] || 9) - (KIND_RANK[b.kind] || 9);
+    }).forEach(function (it) {
+      out.push({
+        text: shortName(it.name),
+        cls: it.kind === 'fast' ? 'fast' : it.kind === 'modern' ? 'modern' : ''
+      });
+    });
+    if (S.showParasha && info.parasha) out.push({ text: info.parasha.name, cls: 'par' });
+    if (info.special) out.push({ text: info.special, cls: 'par' });
+    return out.slice(0, 2);
+  }
+
   /** תווית ראשית ליום — לפי סדר חשיבות */
   var KIND_RANK = { yomtov: 0, fast: 1, cholhamoed: 2, chanukah: 3, modern: 4, minor: 5, erev: 6, roshchodesh: 7 };
   function mainItem(items) {
@@ -116,24 +133,32 @@
     return out;
   }
 
-  function renderMonthTitle() {
-    var t = $('#month-title');
+  function monthTitleParts() {
     var first, last;
     if (S.calMode === 'greg') {
+      var days = new Date(state.anchor.gy, state.anchor.gm, 0).getDate();
       first = HDate.make(HDate.gregToAbs(state.anchor.gy, state.anchor.gm, 1));
-      last = HDate.make(HDate.gregToAbs(state.anchor.gy, state.anchor.gm, new Date(state.anchor.gy, state.anchor.gm, 0).getDate()));
-      var hebPart = first.monthName + (first.monthName !== last.monthName ? ' – ' + last.monthName : '') +
-        ' ' + (first.hy !== last.hy ? last.yearHeb : first.yearHeb);
-      t.innerHTML = '<div class="heb">' + esc(hebPart) + '</div><div class="greg">' +
-        esc(HDate.GREG_MONTHS[state.anchor.gm - 1] + ' ' + state.anchor.gy) + '</div>';
-    } else {
-      first = HDate.make(HDate.hebToAbs(state.anchor.hy, state.anchor.hm, 1));
-      last = HDate.make(HDate.hebToAbs(state.anchor.hy, state.anchor.hm, HDate.daysInMonth(state.anchor.hm, state.anchor.hy)));
-      var g = HDate.GREG_MONTHS[first.gm - 1] + (first.gm !== last.gm ? ' – ' + HDate.GREG_MONTHS[last.gm - 1] : '') +
-        ' ' + last.gy;
-      t.innerHTML = '<div class="heb">' + esc(first.monthName + ' ' + first.yearHeb) + '</div>' +
-        '<div class="greg">' + esc(g) + '</div>';
+      last = HDate.make(HDate.gregToAbs(state.anchor.gy, state.anchor.gm, days));
+      return {
+        heb: first.monthName + (first.monthName !== last.monthName ? ' – ' + last.monthName : '') +
+          ' ' + (first.hy !== last.hy ? last.yearHeb : first.yearHeb),
+        greg: HDate.GREG_MONTHS[state.anchor.gm - 1] + ' ' + state.anchor.gy
+      };
     }
+    first = HDate.make(HDate.hebToAbs(state.anchor.hy, state.anchor.hm, 1));
+    last = HDate.make(HDate.hebToAbs(state.anchor.hy, state.anchor.hm,
+      HDate.daysInMonth(state.anchor.hm, state.anchor.hy)));
+    return {
+      heb: first.monthName + ' ' + first.yearHeb,
+      greg: HDate.GREG_MONTHS[first.gm - 1] +
+        (first.gm !== last.gm ? ' – ' + HDate.GREG_MONTHS[last.gm - 1] : '') + ' ' + last.gy
+    };
+  }
+
+  function renderMonthTitle() {
+    var t = monthTitleParts();
+    $('#month-title').innerHTML = '<div class="heb">' + esc(t.heb) + '</div>' +
+      '<div class="greg">' + esc(t.greg) + '</div>';
   }
 
   function renderGrid() {
@@ -144,21 +169,16 @@
     monthCells().forEach(function (c) {
       var h = HDate.make(c.abs);
       var info = Holidays.forDate(h, S.israel);
+      var labels = dayLabels(info);
       var cell = el('div', 'cell' + (c.out ? ' out' : '') + (h.dow === 6 ? ' shabbat' : '') +
-        (c.abs === tAbs ? ' today' : '') + (c.abs === state.sel ? ' sel' : ''));
+        (c.abs === tAbs ? ' today' : '') + (c.abs === state.sel ? ' sel' : '') +
+        (labels.length > 1 ? ' multi' : ''));
       cell.appendChild(el('div', 'g', String(h.gd)));
       cell.appendChild(el('div', 'h', h.dayHeb));
-      var m = mainItem(info.items);
-      var lbl = '', cls = '';
-      if (m) {
-        lbl = shortName(m.name);
-        cls = (m.kind === 'fast') ? ' fast' : (m.kind === 'modern') ? ' modern' : '';
-      } else if (S.showParasha && info.parasha) {
-        lbl = info.parasha.name; cls = ' par';
-      } else if (info.special) {
-        lbl = info.special;
-      }
-      if (lbl) cell.appendChild(el('div', 'lbl' + cls, esc(lbl)));
+      labels.forEach(function (l) {
+        cell.appendChild(el('div', 'lbl' + (l.cls ? ' ' + l.cls : '') +
+          (l.text.length > 9 ? ' long' : ''), esc(l.text)));
+      });
       cell.addEventListener('click', function () { state.sel = c.abs; renderCal(); });
       grid.appendChild(cell);
     });
@@ -168,82 +188,37 @@
     var h = HDate.make(state.sel);
     var info = Holidays.forDate(h, S.israel);
     var z = Zmanim.compute(h.date, loc(), zopts());
-    var up = Holidays.upcomingShabbat(state.sel, S.israel);
-    var c = $('#daycard');
     var tags = [];
     info.items.forEach(function (it) {
-      var cls = it.kind === 'yomtov' ? ' yomtov' : it.kind === 'fast' ? ' fast' : it.kind === 'modern' ? ' modern' : '';
+      var cls = it.kind === 'yomtov' ? ' yomtov' : it.kind === 'fast' ? ' fast' : '';
       tags.push('<span class="tag' + cls + '">' + esc(it.name) + '</span>');
     });
     if (info.special) tags.push('<span class="tag">' + esc(info.special) + '</span>');
-    if (info.mevarchim) tags.push('<span class="tag">שבת מברכים</span>');
-    if (info.omer) tags.push('<span class="tag">' + esc('עומר: יום ' + info.omer) + '</span>');
     if (info.candles) tags.push('<span class="tag">' + esc(candleText(info.candles)) + '</span>');
     if (info.mevarchim) tags.push('<span class="tag">' + esc(HDate.moladText(h.hy, Holidays.nextMonth(h.hm, h.hy))) + '</span>');
 
-    var parName = info.parasha ? ('פרשת ' + info.parasha.name) : (up ? up.label : '');
-    c.innerHTML =
-      '<div class="card-pad">' +
-      '<div class="row"><div>' +
-      '<div class="hd">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
-      '<div class="gd">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
-      '</div>' +
-      (parName ? '<div class="par">' + esc(parName) + '</div>' : '') +
-      '</div>' +
-      (tags.length ? '<div class="tags">' + tags.join('') + '</div>' : '') +
-      '<div class="quick">' +
-      '<div><div class="k">הנץ החמה</div><div class="v">' + fmtTime(z.sunrise) + '</div></div>' +
-      '<div><div class="k">שקיעה</div><div class="v">' + fmtTime(z.sunset) + '</div></div>' +
-      '<div><div class="k">' + (h.dow === 5 ? 'הדלקת נרות' : h.dow === 6 ? 'צאת שבת' : 'צאת הכוכבים') + '</div>' +
-      '<div class="v">' + fmtTime(h.dow === 5 ? z.candles : h.dow === 6 ? z.tzeitShabbat : z.tzeit) + '</div></div>' +
-      '</div>' +
-      '<button class="tag" id="go-zman" style="margin-top:14px;width:100%;padding:10px;background:var(--gold);color:#17203a;font-weight:600;border-radius:12px">כל זמני היום ←</button>' +
-      '</div>';
-    $('#go-zman').addEventListener('click', function () {
-      state.zman = state.sel; go('zman');
-    });
-  }
+    var par = info.parasha ? ('פרשת ' + info.parasha.name) : '';
+    var third = h.dow === 5 ? ['הדלקת נרות', z.candles]
+      : h.dow === 6 ? ['צאת השבת', z.tzeitShabbat] : ['צאת הכוכבים', z.tzeit];
 
-  /** אירועים קרובים */
-  function renderUpcoming() {
-    var box = $('#upcoming');
-    box.innerHTML = '';
-    var start = todayAbs(), found = 0;
-    var SHOW = { yomtov: 1, fast: 1, modern: 1, minor: 1 };
-    for (var a = start; a < start + 400 && found < 7; a++) {
-      var h = HDate.make(a);
-      var items = Holidays.holidaysFor(h.hy, h.hm, h.hd, S.israel);
-      var pick = null;
-      items.forEach(function (it) {
-        if (SHOW[it.kind] && !pick) pick = it;
-        if (it.kind === 'chanukah' && it.name.indexOf('נר 1') > -1 && !pick) pick = { name: 'חנוכה', kind: 'minor' };
-      });
-      if (!pick) continue;
-      if (pick.name.indexOf('יום ב׳') > -1) continue;
-      found++;
-      var days = a - start;
-      var row = el('div', 'item');
-      row.innerHTML = '<div class="txt"><div class="t">' + esc(pick.name) + '</div>' +
-        '<div class="s">' + esc(h.dayHebMarks + ' ' + h.monthName + ' · ' + HDate.DAY_NAMES[h.dow] + ', ' + gregStr(h, true)) + '</div></div>' +
-        '<div class="val" style="font-size:13px;color:var(--muted);white-space:nowrap">' +
-        (days === 0 ? 'היום' : days === 1 ? 'מחר' : 'בעוד ' + days + ' ימים') + '</div>';
-      (function (abs) {
-        row.addEventListener('click', function () { state.sel = abs; resetAnchor(abs); renderCal(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
-      })(a);
-      box.appendChild(row);
-    }
-    if (!found) box.appendChild(el('div', 'empty', 'אין אירועים קרובים'));
+    $('#daycard').innerHTML =
+      '<div class="dc-head"><div>' +
+      '<div class="dc-date">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
+      '<div class="dc-greg">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
+      '</div>' + (par ? '<div class="dc-par">' + esc(par) + '</div>' : '') + '</div>' +
+      (tags.length ? '<div class="dc-tags">' + tags.join('') + '</div>' : '') +
+      (info.omer ? '<div class="dc-omer">' + esc(Holidays.omerText(info.omer)) + '</div>' : '') +
+      '<button class="dc-times" id="go-zman">' +
+      '<span class="t"><span class="k">הנץ החמה</span><br><span class="v">' + fmtTime(z.sunrise) + '</span></span>' +
+      '<span class="t"><span class="k">שקיעה</span><br><span class="v">' + fmtTime(z.sunset) + '</span></span>' +
+      '<span class="t"><span class="k">' + esc(third[0]) + '</span><br><span class="v">' + fmtTime(third[1]) + '</span></span>' +
+      '<svg class="chev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>' +
+      '</button>';
+    $('#go-zman').addEventListener('click', function () { state.zman = state.sel; go('zman'); });
   }
 
   function renderCal() {
-    renderGrid(); renderDayCard(); renderUpcoming();
-    $('#foot-cal').innerHTML = 'תצוגה: ' + (S.calMode === 'greg' ? 'חודש לועזי' : 'חודש עברי') +
-      ' · <a href="#" id="toggle-mode">החלפה</a>';
-    $('#toggle-mode').addEventListener('click', function (e) {
-      e.preventDefault();
-      S.calMode = S.calMode === 'greg' ? 'heb' : 'greg'; save();
-      resetAnchor(state.sel); renderCal();
-    });
+    renderGrid(); renderDayCard();
   }
 
   function shiftMonth(dir) {
@@ -267,18 +242,6 @@
   }
 
   /* ================= זמני היום ================= */
-  function nextShabbatInfo(abs) {
-    // מחזיר את השבת הקרובה (או הנוכחית) עם זמני כניסה ויציאה
-    var d = ((abs % 7) + 7) % 7;
-    var sat = abs + ((6 - d) % 7);
-    var fri = sat - 1;
-    var hf = HDate.make(fri), hs = HDate.make(sat);
-    var zf = Zmanim.compute(hf.date, loc(), zopts());
-    var zs = Zmanim.compute(hs.date, loc(), zopts());
-    return { fri: hf, sat: hs, candles: zf.candles, end: zs.tzeitShabbat,
-      label: Holidays.upcomingShabbat(sat, S.israel).label };
-  }
-
   function renderZman() {
     var h = HDate.make(state.zman);
     var info = Holidays.forDate(h, S.israel);
@@ -291,11 +254,6 @@
       (isToday ? ' · היום' : '') + '</div>';
     $('#z-sunrise').textContent = fmtTime(z.sunrise);
     $('#z-sunset').textContent = fmtTime(z.sunset);
-
-    var sh = nextShabbatInfo(state.zman);
-    $('#z-shabbat').innerHTML =
-      '<span>' + esc(sh.label + ' · ' + sh.sat.gd + '.' + sh.sat.gm) + '</span>' +
-      '<span>נרות <b>' + fmtTime(sh.candles) + '</b> · צאת <b>' + fmtTime(sh.end) + '</b></span>';
 
     $('.name', $('#z-loc')).textContent = S.locName;
 
@@ -399,18 +357,16 @@
     $('#conv-greg').value = h.gy + '-' + String(h.gm).padStart(2, '0') + '-' + String(h.gd).padStart(2, '0');
     fillHebSelects(h.hy, h.hm, h.hd);
     var info = Holidays.forDate(h, S.israel);
-    var up = Holidays.upcomingShabbat(convAbs, S.israel);
     var lines = [];
     if (info.items.length) lines.push(info.items.map(function (i) { return i.name; }).join(' · '));
     if (info.special) lines.push(info.special);
     if (info.omer) lines.push(Holidays.omerText(info.omer));
     if (info.candles) lines.push(candleText(info.candles));
     if (info.mevarchim) lines.push(HDate.moladText(h.hy, Holidays.nextMonth(h.hm, h.hy)));
-    if (up) lines.push(up.label);
     $('#conv-result').innerHTML =
       '<div class="big">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
       '<div class="sub">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + h.gd + ' ב' + HDate.GREG_MONTHS[h.gm - 1] + ' ' + h.gy) + '</div>' +
-      (lines.length ? '<div class="sub" style="color:var(--gold);margin-top:8px">' + esc(lines.join(' · ')) + '</div>' : '');
+      (lines.length ? '<div class="sub" style="color:var(--accent);margin-top:8px">' + esc(lines.join(' · ')) + '</div>' : '');
 
     var box = $('#conv-years');
     box.innerHTML = '';
@@ -458,7 +414,7 @@
   }
 
   function renderSettings() {
-    $('#set-loc-name').textContent = S.locName;
+    $('#set-loc-name').textContent = S.locName + (S.isGps ? ' · GPS' : '');
     $('#set-loc-sub').textContent = S.lat.toFixed(4) + '°, ' + S.lng.toFixed(4) + '°' +
       (S.useElevation ? ' · ' + Math.round(S.elevation) + ' מ׳' : '');
 
@@ -495,7 +451,7 @@
       'לוח · לוח שנה עברי וזמני היום<br>' +
       'כל החישובים מתבצעים במכשיר — ללא שרת, ללא מעקב וללא פרסומות.<br>' +
       'ניתן להוסיף למסך הבית ולעבוד גם ללא חיבור לאינטרנט.<br>' +
-      '<span style="opacity:.6">גרסה 1.0</span>';
+      '<span style="opacity:.6">גרסה ' + APP_VERSION + '</span>';
   }
 
   /* ================= חלון בחירת מיקום ================= */
@@ -544,7 +500,7 @@
           var active = isGreg ? (m === state.anchor.gm) : (m === state.anchor.hm);
           b.textContent = isGreg ? HDate.GREG_MONTHS[m - 1] : HDate.monthName(m, year);
           b.style.cssText = 'padding:12px 4px;border-radius:12px;font-size:13.5px;' +
-            (active ? 'background:var(--gold);color:#17203a;font-weight:600'
+            (active ? 'background:var(--accent);color:var(--on-accent);font-weight:600'
               : 'background:var(--surface);color:var(--ink)');
           b.addEventListener('click', function () {
             state.anchor = isGreg ? { gy: year, gm: m } : { hy: year, hm: m };
@@ -600,7 +556,7 @@
           var row = el('div', 'item');
           row.innerHTML = '<div class="txt"><div class="t">' + esc(city.name) + '</div>' +
             '<div class="s">' + city.lat.toFixed(3) + '°, ' + city.lng.toFixed(3) + '°</div></div>' +
-            (city.name === S.locName ? '<div class="val" style="color:var(--gold);font-size:14px">✓</div>' : '');
+            (city.name === S.locName ? '<div class="val" style="color:var(--accent);font-size:14px">✓</div>' : '');
           row.addEventListener('click', function () { setCity(city); closeSheet(); });
           results.appendChild(row);
         });
@@ -617,6 +573,7 @@
     S.elevation = city.elevation; S.tz = city.tz;
     // מנהגי הדלקת נרות מקובלים — נקבעים מחדש בכל החלפת יישוב
     S.candles = city.name === 'ירושלים' ? 40 : city.name === 'חיפה' ? 30 : 20;
+    S.isGps = false;
     save(); renderAll();
   }
 
@@ -630,10 +587,55 @@
       var near = Cities.nearest(S.lat, S.lng);
       S.locName = (near && near.deg < 0.12) ? near.city.name : 'המיקום שלי';
       S.candles = S.locName === 'ירושלים' ? 40 : S.locName === 'חיפה' ? 30 : 20;
+      S.isGps = true;
       save(); renderAll();
     }, function () {
       alert('לא ניתן לאתר את המיקום. ניתן לבחור יישוב מהרשימה.');
     }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 600000 });
+  }
+
+  /* ================= הדפסה ================= */
+  /** בונה טבלת לוח לרוחב העמוד ופותח את חלון ההדפסה */
+  function printMonth() {
+    var t = monthTitleParts();
+    var cells = monthCells();
+    var html = '<div class="pr-head"><div><div class="a">' + esc(t.heb) + '</div></div>' +
+      '<div class="b">' + esc(t.greg) + '</div></div>' +
+      '<table class="pr-table"><thead><tr>' +
+      HDate.DAY_NAMES.map(function (d, i) {
+        return '<th>' + esc(i === 6 ? 'שבת' : d) + '</th>';
+      }).join('') + '</tr></thead><tbody>';
+
+    for (var r = 0; r < cells.length; r += 7) {
+      html += '<tr>';
+      for (var i = 0; i < 7; i++) {
+        var c = cells[r + i];
+        if (!c) { html += '<td></td>'; continue; }
+        var h = HDate.make(c.abs);
+        var info = Holidays.forDate(h, S.israel);
+        html += '<td class="' + (h.dow === 6 ? 'sh ' : '') + (c.out ? 'out' : '') + '">' +
+          '<div class="pr-top"><span class="pr-h">' + esc(h.dayHeb) + '</span>' +
+          '<span class="pr-g">' + h.gd + '</span></div>';
+        var lines = [];
+        info.items.slice().sort(function (a, b) {
+          return (KIND_RANK[a.kind] || 9) - (KIND_RANK[b.kind] || 9);
+        }).forEach(function (it) { lines.push({ text: it.name, par: false }); });
+        if (info.parasha) lines.push({ text: info.parasha.name, par: true });
+        if (info.special) lines.push({ text: info.special, par: true });
+        lines.slice(0, 3).forEach(function (l) {
+          html += '<div class="pr-l' + (l.par ? ' par' : '') + '">' + esc(l.text) + '</div>';
+        });
+        html += '</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table><div class="pr-foot"><span>' +
+      esc(HDate.make(cells[0].abs).yearHeb === HDate.make(cells[cells.length - 1].abs).yearHeb
+        ? 'שנת ' + HDate.make(cells[0].abs).yearHeb : '') +
+      '</span><span>לוח · לוח שנה עברי</span></div>';
+
+    $('#print-area').innerHTML = html;
+    window.print();
   }
 
   /* ================= ניווט ותצוגה ================= */
@@ -644,7 +646,9 @@
     $$('.tabbar button').forEach(function (b) { b.classList.toggle('active', b.dataset.view === view); });
     $('#page-title').textContent = TITLES[view];
     $('#btn-jump').classList.toggle('hidden', view === 'conv' || view === 'set');
-    window.scrollTo(0, 0);
+    $('#act-print').classList.toggle('hidden', view !== 'cal');
+    var v = $('#view-' + view);
+    if (v) v.scrollTop = 0;
     if (view === 'zman') renderZman();
     if (view === 'conv') renderConv();
     if (view === 'set') renderSettings();
@@ -657,14 +661,48 @@
     }
     document.documentElement.dataset.theme = t;
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#0f1729' : '#17203a');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#1c1b19' : '#f4f2ec');
+  }
+
+  function renderLocLabel() {
+    $('#topbar-loc').textContent = S.isGps ? 'GPS' : S.locName;
   }
 
   function renderAll() {
-    applyTheme(); renderCal();
+    applyTheme(); renderLocLabel(); renderCal();
     if (state.view === 'zman') renderZman();
     if (state.view === 'conv') renderConv();
     if (state.view === 'set') renderSettings();
+  }
+
+  /* ================= עדכוני גרסה ================= */
+  /** רישום ה־Service Worker, בדיקת עדכון בכל פתיחה, ורענון אוטומטי כשמגיעה גרסה חדשה */
+  function setupUpdates() {
+    if (!('serviceWorker' in navigator)) return;
+    var hadController = !!navigator.serviceWorker.controller;
+    var reloading = false;
+
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      // גרסה חדשה השתלטה — רענון פעם אחת בלבד, ורק אם כבר הייתה גרסה מותקנת
+      if (reloading || !hadController) return;
+      reloading = true;
+      location.reload();
+    });
+
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(function (reg) {
+        reg.update().catch(function () { });
+        // בדיקת עדכון בכל חזרה לאפליקציה, לכל היותר פעם בחמש דקות
+        var last = 0;
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState !== 'visible') return;
+          var now = Date.now();
+          if (now - last < 300000) return;
+          last = now;
+          reg.update().catch(function () { });
+        });
+      })
+      .catch(function () { });
   }
 
   /* ================= אתחול ================= */
@@ -688,7 +726,8 @@
     $('#z-loc').addEventListener('click', openLocationPicker);
     $('#set-loc').addEventListener('click', openLocationPicker);
     $('#set-gps').addEventListener('click', useGps);
-    $('#btn-today').addEventListener('click', openLocationPicker);
+    $('#btn-loc').addEventListener('click', openLocationPicker);
+    $('#act-print').addEventListener('click', printMonth);
     $('#btn-jump').addEventListener('click', jumpToday);
     $$('[data-close]').forEach(function (x) { x.addEventListener('click', closeSheet); });
 
@@ -714,10 +753,11 @@
     grid.addEventListener('touchend', function (e) {
       if (x0 === null) return;
       var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
-      if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.6) shiftMonth(dx > 0 ? -1 : 1);
+      if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.6) shiftMonth(dx > 0 ? 1 : -1);
       x0 = null;
     }, { passive: true });
 
+    renderLocLabel();
     renderCal();
     go('cal');
 
@@ -730,11 +770,7 @@
       if (t !== initDay) { initDay = t; state.sel = t; state.zman = t; resetAnchor(t); renderAll(); }
     }, 60000);
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('sw.js').catch(function () { });
-      });
-    }
+    setupUpdates();
   }
   var initDay = todayAbs();
 

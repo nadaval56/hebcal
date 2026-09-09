@@ -4,8 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>לוח — לוח שנה עברי וזמני היום</title>
-<meta name="description" content="לוח שנה עברי־לועזי וזמני היום, ללא פרסומות וללא אינטרנט. עובד כאפליקציה על מסך הבית.">
-<meta name="theme-color" content="#17203a">
+<meta name="description" content="לוח שנה עברי ולועזי במקביל, זמני היום המלאים, חגים ופרשת השבוע — לפי המיקום שלך. ללא פרסומות, עובד גם ללא אינטרנט, וניתן להתקנה כאפליקציה על מסך הבית.">
+<meta name="theme-color" content="#f4f2ec">
+
+<!-- תצוגה מקדימה בוואטסאפ וברשתות -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="לוח">
+<meta property="og:locale" content="he_IL">
+<meta property="og:url" content="https://nadaval56.github.io/hebcal/">
+<meta property="og:title" content="לוח — לוח שנה עברי וזמני היום">
+<meta property="og:description" content="תאריך עברי ולועזי במקביל, זמני היום המלאים, חגים ופרשת השבוע לפי המיקום שלך. ללא פרסומות ועובד גם ללא אינטרנט.">
+<meta property="og:image" content="https://nadaval56.github.io/hebcal/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="לוח — לוח שנה עברי וזמני היום">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="לוח — לוח שנה עברי וזמני היום">
+<meta name="twitter:description" content="תאריך עברי ולועזי במקביל, זמני היום המלאים, חגים ופרשת השבוע לפי המיקום שלך.">
+<meta name="twitter:image" content="https://nadaval56.github.io/hebcal/assets/og.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -32,14 +49,16 @@
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
   <symbol id="i-candle" viewBox="0 0 24 24"><path d="M9 21h6M12 21v-3M9 18h6v-7a3 3 0 0 0-6 0z"/><path d="M12 8V5c0-1 1-1.5 1-2.5"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.6 4.5h5.2l-2.6 4.5 2.6 4.5h-5.2L12 21l-2.6-4.5H4.2l2.6-4.5-2.6-4.5h5.2z"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 9V4h12v5M6 18H4v-6h16v6h-2M8 14h8v6H8z"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v13M12 3 8 7M12 3l4 4M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></symbol>
 </svg>
 
 <div id="app">
   <header class="topbar">
     <div class="topbar-inner">
-      <button class="icon-btn" id="btn-today" title="מיקום"><svg><use href="#i-pin"/></svg></button>
+      <button class="loc-btn" id="btn-loc" title="מיקום"><svg><use href="#i-pin"/></svg><span id="topbar-loc"></span></button>
       <h1 id="page-title">לוח</h1>
+      <button class="icon-btn" id="act-print" title="הדפסת החודש"><svg><use href="#i-print"/></svg></button>
       <button class="pill" id="btn-jump">היום</button>
     </div>
   </header>
@@ -54,14 +73,11 @@
       </div>
       <div class="weekdays"><div>א׳</div><div>ב׳</div><div>ג׳</div><div>ד׳</div><div>ה׳</div><div>ו׳</div><div>שבת</div></div>
       <div class="grid" id="grid"></div>
-      <div class="card daycard" id="daycard"></div>
-      <div class="section-title">אירועים קרובים</div>
-      <div class="card"><div class="list" id="upcoming"></div></div>
-      <div class="foot" id="foot-cal"></div>
+      <div class="daycard" id="daycard"></div>
     </section>
 
     <!-- זמני היום -->
-    <section class="view" id="view-zman">
+    <section class="view scroll" id="view-zman">
       <div class="hero">
         <div class="date-nav">
           <button id="z-prev" aria-label="יום קודם"><svg><use href="#i-next"/></svg></button>
@@ -72,7 +88,6 @@
           <div class="box"><div class="k"><svg><use href="#i-sun"/></svg>הנץ החמה</div><div class="v" id="z-sunrise">--:--</div></div>
           <div class="box"><div class="k"><svg><use href="#i-moon"/></svg>שקיעה</div><div class="v" id="z-sunset">--:--</div></div>
         </div>
-        <div class="shabbat-strip" id="z-shabbat"></div>
       </div>
       <div class="countdown" id="z-countdown"></div>
       <button class="loc-chip" id="z-loc">
@@ -83,7 +98,7 @@
     </section>
 
     <!-- ממיר תאריכים -->
-    <section class="view" id="view-conv">
+    <section class="view scroll" id="view-conv">
       <div class="card">
         <div class="field">
           <label>תאריך לועזי</label>
@@ -104,16 +119,16 @@
     </section>
 
     <!-- הגדרות -->
-    <section class="view" id="view-set">
+    <section class="view scroll" id="view-set">
       <div class="section-title">מיקום</div>
       <div class="card">
         <button class="setting" id="set-loc" style="width:100%;text-align:start">
           <div class="txt"><div class="t" id="set-loc-name"></div><div class="s" id="set-loc-sub"></div></div>
-          <svg class="icon-btn" style="width:20px;height:20px;stroke:var(--gold);fill:none;stroke-width:1.8"><use href="#i-prev"/></svg>
+          <svg class="icon-btn" style="width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.8"><use href="#i-prev"/></svg>
         </button>
         <button class="setting" id="set-gps" style="width:100%;text-align:start">
           <div class="txt"><div class="t">איתור אוטומטי</div><div class="s">שימוש ב־GPS של המכשיר</div></div>
-          <svg class="icon-btn" style="width:20px;height:20px;stroke:var(--gold);fill:none;stroke-width:1.8"><use href="#i-gps"/></svg>
+          <svg class="icon-btn" style="width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.8"><use href="#i-gps"/></svg>
         </button>
       </div>
 
@@ -143,6 +158,8 @@
     <div class="sheet-body" id="sheet-body"></div>
   </div>
 </div>
+
+<div id="print-area"></div>
 
 <script src="js/hdate.js"></script>
 <script src="js/zmanim.js"></script>

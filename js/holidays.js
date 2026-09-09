@@ -162,6 +162,7 @@ var Holidays = (function (H) {
         if (hd === 21) add('הושענא רבה', 'cholhamoed');
         if (hd === 22) add(israel ? 'שמיני עצרת · שמחת תורה' : 'שמיני עצרת', 'yomtov');
         if (hd === 23 && !israel) add('שמחת תורה', 'yomtov');
+        if (hd === (israel ? 23 : 24)) add('אסרו חג', 'minor');
         break;
       case 9: // כסלו
         if (hd === 24) add('ערב חנוכה', 'erev');
@@ -199,6 +200,7 @@ var Holidays = (function (H) {
       if (hd >= 17 && hd <= 20) add('חול המועד פסח', 'cholhamoed');
       if (hd === 21) add('שביעי של פסח', 'yomtov');
       if (hd === 22 && !israel) add('אחרון של פסח', 'yomtov');
+      if (hd === (israel ? 22 : 23)) add('אסרו חג', 'minor');
       // יום הזיכרון לשואה ולגבורה
       if (hd === 27 && d !== 5 && d !== 0) add('יום הזיכרון לשואה ולגבורה', 'modern');
       if (hd === 26 && d === 4) add('יום הזיכרון לשואה ולגבורה', 'modern');
@@ -218,6 +220,7 @@ var Holidays = (function (H) {
       if (hd === 5) add('ערב שבועות', 'erev');
       if (hd === 6) add('שבועות', 'yomtov');
       if (hd === 7 && !israel) add('שבועות — יום ב׳', 'yomtov');
+      if (hd === (israel ? 7 : 8)) add('אסרו חג', 'minor');
     }
 
     if (hm === 4) { // תמוז
@@ -265,17 +268,35 @@ var Holidays = (function (H) {
     return (n >= 1 && n <= 49) ? n : 0;
   }
 
+  /* נוסח ספירת העומר */
+  var OMER_ONES = ['', 'אחד', 'שני', 'שלושה', 'ארבעה', 'חמישה', 'ששה',
+    'שבעה', 'שמונה', 'תשעה', 'עשרה'];
+  var OMER_TEENS = ['עשרה', 'אחד עשר', 'שנים עשר', 'שלושה עשר', 'ארבעה עשר',
+    'חמישה עשר', 'ששה עשר', 'שבעה עשר', 'שמונה עשר', 'תשעה עשר'];
+  var OMER_TENS = { 20: 'עשרים', 30: 'שלושים', 40: 'ארבעים' };
+  // בצירוף עם עשרות אומרים "שנים ועשרים" ולא "שני ועשרים"
+  var OMER_ONES_PAIR = ['', 'אחד', 'שנים', 'שלושה', 'ארבעה', 'חמישה', 'ששה',
+    'שבעה', 'שמונה', 'תשעה'];
+  var OMER_WEEKS = ['', 'שבוע אחד', 'שני שבועות', 'שלושה שבועות', 'ארבעה שבועות',
+    'חמישה שבועות', 'ששה שבועות', 'שבעה שבועות'];
+
+  /** מספר הימים בנוסח הספירה, למשל 12 → "שנים עשר יום" */
+  function omerDaysPhrase(n) {
+    if (n === 1) return 'יום אחד';
+    if (n <= 10) return OMER_ONES[n] + ' ימים';
+    if (n < 20) return OMER_TEENS[n - 10] + ' יום';
+    if (n % 10 === 0) return OMER_TENS[n] + ' יום';
+    return OMER_ONES_PAIR[n % 10] + ' ו' + OMER_TENS[Math.floor(n / 10) * 10] + ' יום';
+  }
+
+  /** נוסח מלא: "היום שנים עשר יום, שהם שבוע אחד וחמישה ימים לעומר" */
   function omerText(n) {
     if (!n) return '';
-    var weeks = Math.floor(n / 7), days = n % 7;
-    var s = 'היום ' + (n === 1 ? 'יום אחד' : H.num2heb(n, false) + ' ימים').replace('יום אחד', 'יום אחד');
-    if (n === 1) s = 'היום יום אחד';
-    else if (n === 2) s = 'היום שני ימים';
-    else s = 'היום ' + n + ' ימים';
+    var s = 'היום ' + omerDaysPhrase(n);
     if (n >= 7) {
-      s += ', שהם ';
-      s += weeks === 1 ? 'שבוע אחד' : weeks + ' שבועות';
-      if (days) s += ' ו' + (days === 1 ? 'יום אחד' : days + ' ימים');
+      var weeks = Math.floor(n / 7), days = n % 7;
+      s += ', שהם ' + OMER_WEEKS[weeks];
+      if (days) s += ' ו' + (days === 1 ? 'יום אחד' : OMER_ONES[days] + ' ימים');
     }
     return s + ' לעומר';
   }
@@ -328,7 +349,7 @@ var Holidays = (function (H) {
     holidaysFor: holidaysFor,
     specialShabbat: specialShabbat,
     isShabbatMevarchim: isShabbatMevarchim, nextMonth: nextMonth,
-    omerDay: omerDay, omerText: omerText,
+    omerDay: omerDay, omerText: omerText, omerDaysPhrase: omerDaysPhrase,
     yomHaatzmautAbs: yomHaatzmautAbs,
     shabbatotOfYear: shabbatotOfYear,
     forDate: forDate
