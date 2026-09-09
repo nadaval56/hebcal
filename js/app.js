@@ -615,9 +615,8 @@
   function setCity(city) {
     S.locName = city.name; S.lat = city.lat; S.lng = city.lng;
     S.elevation = city.elevation; S.tz = city.tz;
-    // מנהגי הדלקת נרות מקובלים
-    if (city.name === 'ירושלים') S.candles = 40;
-    else if (city.name === 'חיפה') S.candles = 30;
+    // מנהגי הדלקת נרות מקובלים — נקבעים מחדש בכל החלפת יישוב
+    S.candles = city.name === 'ירושלים' ? 40 : city.name === 'חיפה' ? 30 : 20;
     save(); renderAll();
   }
 
@@ -630,6 +629,7 @@
       try { S.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || S.tz; } catch (e) { }
       var near = Cities.nearest(S.lat, S.lng);
       S.locName = (near && near.deg < 0.12) ? near.city.name : 'המיקום שלי';
+      S.candles = S.locName === 'ירושלים' ? 40 : S.locName === 'חיפה' ? 30 : 20;
       save(); renderAll();
     }, function () {
       alert('לא ניתן לאתר את המיקום. ניתן לבחור יישוב מהרשימה.');
