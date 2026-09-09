@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.9.2';
+  var APP_VERSION = '1.9.3';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -166,6 +166,8 @@
   }
 
   var denseLabels = false; // בתאים נמוכים אין מקום לשתי תוויות
+  var forceDense = false;  // נקבע כשנמדדה חריגה בפועל, למשל בגופן מוגדל
+  var fitting = false;     // שומר מפני רינדור חוזר אינסופי
   var MIN_CARD_H = 132;   // גובה מזערי לכרטיס היום
   var CARD_MAX_H = 274;   // גובה הכרטיס ביום העמוס ביותר (ספירת העומר עם תגיות)
   var MIN_CELL_H = 50;    // גובה תא מזערי שבו התוכן עדיין נכנס
@@ -190,7 +192,7 @@
     grid.style.setProperty('--row-h', h + 'px');
     // שתי תוויות דורשות שתי שורות טקסט מעל האות והתאריך; אם אין להן מקום,
     // עדיף להציג אחת מלאה מאשר שתיים שנדרסות זו על זו.
-    denseLabels = h < 55;
+    denseLabels = forceDense || h < 55;
   }
 
   function renderMonthTitle() {
@@ -223,6 +225,7 @@
       cell.addEventListener('click', function () { state.sel = c.abs; renderCal(); });
       grid.appendChild(cell);
     });
+    fitLabels();
   }
 
   /** שתי ספירות העומר: זו שנספרה אמש וזו שייספרו הערב */
@@ -235,6 +238,26 @@
         esc(Holidays.omerText(omer.tonight)) + '</div>';
     }
     return html + '</div>';
+  }
+
+  /**
+   * בודק אם טקסט התוויות נחתך בפועל — הסימן הוא שגובה התוכן הפנימי גדול
+   * מהנראה ביותר מחצי שורה — ואם כן מצמצם לתווית אחת ומרנדר מחדש פעם אחת.
+   * כך הלוח מסתדר גם כשגודל הגופן במכשיר גדול מהמצופה.
+   */
+  function fitLabels() {
+    if (fitting || forceDense) return;
+    var labels = $('#grid').querySelectorAll('.lbl');
+    for (var i = 0; i < labels.length; i++) {
+      var lh = parseFloat(window.getComputedStyle(labels[i]).lineHeight) || 12;
+      if (labels[i].scrollHeight - labels[i].clientHeight > lh * 0.5) {
+        forceDense = true;
+        fitting = true;
+        renderGrid();
+        fitting = false;
+        return;
+      }
+    }
   }
 
   function renderDayCard() {
@@ -905,7 +928,7 @@
       });
     });
 
-    window.addEventListener('resize', function () { renderGrid(); });
+    window.addEventListener('resize', function () { forceDense = false; renderGrid(); });
 
     // החלקה בין חודשים
     var x0 = null, y0 = null;
