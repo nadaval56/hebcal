@@ -1,12 +1,13 @@
 /* sw.js — מטמון לעבודה ללא אינטרנט, עם עדכון כפוי בכל טעינה מקוונת.
    כשמתפרסמת גרסה חדשה באתר, המכשיר מקבל אותה מיד — בלי מטמון תקוע. */
-var VERSION = '1.9.3';
+var VERSION = '1.10.0';
 var CACHE = 'luach-' + VERSION;
 var ASSETS = [
   './', 'index.html', 'css/app.css',
   'js/hdate.js', 'js/zmanim.js', 'js/holidays.js', 'js/cities.js', 'js/app.js',
   'manifest.webmanifest', 'assets/icon.svg', 'assets/icon-192.png',
-  'assets/icon-512.png', 'assets/icon-180.png', 'assets/icon-maskable.png', 'assets/og.png'
+  'assets/icon-512.png', 'assets/icon-180.png', 'assets/icon-maskable.png', 'assets/og.png',
+  'assets/fonts/heebo-hebrew.woff2', 'assets/fonts/heebo-latin.woff2'
 ];
 
 self.addEventListener('install', function (e) {

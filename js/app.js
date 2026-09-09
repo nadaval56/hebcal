@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.9.3';
+  var APP_VERSION = '1.10.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -165,13 +165,55 @@
     };
   }
 
-  var denseLabels = false; // בתאים נמוכים אין מקום לשתי תוויות
-  var forceDense = false;  // נקבע כשנמדדה חריגה בפועל, למשל בגופן מוגדל
-  var fitting = false;     // שומר מפני רינדור חוזר אינסופי
   var MIN_CARD_H = 132;   // גובה מזערי לכרטיס היום
-  var CARD_MAX_H = 274;   // גובה הכרטיס ביום העמוס ביותר (ספירת העומר עם תגיות)
+  var CARD_MAX_H = 274;   // גיבוי: הכרטיס ביום העמוס ביותר בשנה
+  var cardProbe = null;
+  var cardReserve = CARD_MAX_H;
+  var cardKey = '';
   var MIN_CELL_H = 50;    // גובה תא מזערי שבו התוכן עדיין נכנס
   var CELL_RATIO = 1.0;   // תא ריבועי: גובה השורה כרוחב העמודה
+  var GROW_RATIO = 1.34;  // עד כמה מותר לשורה לגדול מעבר לריבוע כדי שהטקסט ייכנס
+  var rowH = 0, rowCap = 0;
+
+  /**
+   * מודד את גובה הכרטיס ביום העמוס ביותר של החודש המוצג. הלוח שומר מקום
+   * לכרטיס הזה ולא לעמוס בשנה כולה, ולכן בחודש בלי ספירת העומר התאים
+   * גדולים יותר ואין רווח ריק — ועדיין הגובה זהה בכל ימי החודש, בלי קשר
+   * ליום שנבחר.
+   */
+  function measureCard(cells) {
+    var card = $('#daycard');
+    var w = card.offsetWidth;
+    if (!w) return CARD_MAX_H;
+    var key = cells[0].abs + ':' + cells[cells.length - 1].abs + ':' + w + ':' +
+      S.israel + ':' + S.showParasha + ':' + window.innerHeight;
+    if (key === cardKey) return cardReserve;
+    cardKey = key;
+    if (!cardProbe) {
+      cardProbe = el('div', 'daycard');
+      cardProbe.style.cssText = 'position:absolute; top:0; inset-inline-start:0; z-index:-1;' +
+        ' visibility:hidden; pointer-events:none;';
+      document.body.appendChild(cardProbe);
+    }
+    cardProbe.style.width = w + 'px';
+
+    var times = $('#daycard .dc-times');
+    // בטעינה הראשונה שורת הזמנים עדיין לא נבנתה — אז לא שומרים במטמון
+    if (!times) cardKey = '';
+    // offsetHeight אינו כולל את המרווח שמעל שורת הזמנים, והוא חלק מגובה הכרטיס
+    var timesH = 46;
+    if (times) {
+      timesH = times.offsetHeight +
+        (parseFloat(window.getComputedStyle(times).marginTop) || 0);
+    }
+    var max = 0;
+    cells.forEach(function (c) {
+      var h = HDate.make(c.abs);
+      cardProbe.innerHTML = dayCardBody(h, Holidays.forDate(h, S.israel));
+      if (cardProbe.offsetHeight > max) max = cardProbe.offsetHeight;
+    });
+    return Math.max(MIN_CARD_H, max + timesH + 2);
+  }
 
   /**
    * קובע את גובה שורות הלוח מרוחב העמודה ומהמקום הפנוי בלבד — לעולם לא
@@ -185,14 +227,18 @@
     var col = w / 7;
     var avail = $('#view-cal').clientHeight - $('.month-nav').offsetHeight - $('.weekdays').offsetHeight;
     var floor = window.innerHeight <= 720 ? MIN_CELL_H - 4 : MIN_CELL_H;
-    var h = Math.min(col * CELL_RATIO, (avail - CARD_MAX_H) / rows);
-    h = Math.max(h, floor);                           // שמירה על קריאות התא
+    var room = (avail - cardReserve) / rows;          // המקום שנותר אחרי הכרטיס העמוס
+    var h = Math.min(col * CELL_RATIO, room);
+    // רצפת הקריאוּת לא תגבר על המקום שכרטיס היום צריך, אחרת הכרטיס
+    // נדחס וגולל בתוכו
+    h = Math.max(h, Math.min(floor, room));
     h = Math.min(h, (avail - MIN_CARD_H) / rows);     // ובכל זאת בלי גלילה במסך
     h = Math.floor(Math.max(h, 34));
+    // תקרת הגדילה נגזרת מן המקום הפנוי בלבד, לא מן הכרטיס של היום שנבחר,
+    // ולכן גובה השורה נשאר זהה בכל ימי החודש.
+    rowCap = Math.max(h, Math.floor(Math.min(col * GROW_RATIO, room)));
+    rowH = h;
     grid.style.setProperty('--row-h', h + 'px');
-    // שתי תוויות דורשות שתי שורות טקסט מעל האות והתאריך; אם אין להן מקום,
-    // עדיף להציג אחת מלאה מאשר שתיים שנדרסות זו על זו.
-    denseLabels = forceDense || h < 55;
   }
 
   function renderMonthTitle() {
@@ -206,13 +252,13 @@
     var grid = $('#grid');
     grid.innerHTML = '';
     var cells = monthCells();
+    cardReserve = measureCard(cells);
     sizeGrid(cells.length / 7);
     var tAbs = todayAbs();
     cells.forEach(function (c) {
       var h = HDate.make(c.abs);
       var info = Holidays.forDate(h, S.israel);
       var labels = dayLabels(info);
-      if (denseLabels) labels = labels.slice(0, 1);
       var cell = el('div', 'cell' + (c.out ? ' out' : '') + (h.dow === 6 ? ' shabbat' : '') +
         (c.abs === tAbs ? ' today' : '') + (c.abs === state.sel ? ' sel' : '') +
         (labels.length > 1 ? ' multi' : ''));
@@ -225,7 +271,7 @@
       cell.addEventListener('click', function () { state.sel = c.abs; renderCal(); });
       grid.appendChild(cell);
     });
-    fitLabels();
+    fitGrid();
   }
 
   /** שתי ספירות העומר: זו שנספרה אמש וזו שייספרו הערב */
@@ -240,30 +286,114 @@
     return html + '</div>';
   }
 
+  var inkProbe = null;
+  var inkMemo = {};   // מדידת דיו חוזרת על עצמה בין חודשים; שומרים אותה
+
+  /** גובה הדיו בפועל של מחרוזת בגופן נתון — כולל אותיות גבוהות ונמוכות */
+  function inkHeight(font, text) {
+    if (!inkProbe) {
+      var c = document.createElement('canvas');
+      inkProbe = c.getContext && c.getContext('2d');
+      if (!inkProbe) return 0;
+    }
+    var key = font + '|' + text;
+    if (inkMemo[key] !== undefined) return inkMemo[key];
+    inkProbe.font = font;
+    var m = inkProbe.measureText(text);
+    if (!m || m.actualBoundingBoxAscent === undefined) return 0;
+    return (inkMemo[key] = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent);
+  }
+
   /**
-   * בודק אם טקסט התוויות נחתך בפועל — הסימן הוא שגובה התוכן הפנימי גדול
-   * מהנראה ביותר מחצי שורה — ואם כן מצמצם לתווית אחת ומרנדר מחדש פעם אחת.
-   * כך הלוח מסתדר גם כשגודל הגופן במכשיר גדול מהמצופה.
+   * שורת טקסט צרה מן האותיות חותכת את הגליפים עצמם — וזה נראה כמו טקסט
+   * "מגולח" בתחתיתו. מודדים לכל תווית את גובה הדיו בגופן שהמכשיר בחר
+   * ובגודל שהוא קבע, ומרחיבים את השורה אם צריך. כך זה נכון בכל גופן,
+   * בכל שפה ובכל הגדלת טקסט של המשתמש.
    */
-  function fitLabels() {
-    if (fitting || forceDense) return;
-    var labels = $('#grid').querySelectorAll('.lbl');
+  function tuneLineHeights(root) {
+    var labels = (root || $('#grid')).querySelectorAll('.lbl');
     for (var i = 0; i < labels.length; i++) {
-      var lh = parseFloat(window.getComputedStyle(labels[i]).lineHeight) || 12;
-      if (labels[i].scrollHeight - labels[i].clientHeight > lh * 0.5) {
-        forceDense = true;
-        fitting = true;
-        renderGrid();
-        fitting = false;
-        return;
+      var l = labels[i];
+      l.style.lineHeight = '';
+      var st = window.getComputedStyle(l);
+      var lh = parseFloat(st.lineHeight);
+      if (!lh) continue;
+      var ink = inkHeight(st.fontWeight + ' ' + st.fontSize + ' ' + st.fontFamily, l.textContent);
+      if (ink > lh - 0.5) l.style.lineHeight = (Math.ceil(ink) + 1) + 'px';
+    }
+  }
+
+  /**
+   * החריגה, בפיקסלים, של תוכן התא מגבולות התא. מודדים מלבנים בפועל: זו
+   * הדרך היחידה לדעת שהטקסט נחתך במכשיר הזה, עם הגופן והזום שלו, במקום
+   * להסתמך על הנחות בדבר גובה המסך.
+   */
+  function overflowOf(cell) {
+    var kids = cell.children;
+    if (!kids.length) return 0;
+    var box = cell.getBoundingClientRect();
+    return Math.max(box.top - kids[0].getBoundingClientRect().top,
+      kids[kids.length - 1].getBoundingClientRect().bottom - box.bottom);
+  }
+
+  function worstOverflow() {
+    var cells = $('#grid').children, worst = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var o = overflowOf(cells[i]);
+      if (o > worst) worst = o;
+    }
+    return worst;
+  }
+
+  /** מוסיף סיווג צמצום רק לתאים שעדיין חורגים, ולא לכל הלוח */
+  function reduceCells(cls) {
+    var cells = $('#grid').children;
+    for (var i = 0; i < cells.length; i++) {
+      if (overflowOf(cells[i]) > 0.5) cells[i].classList.add(cls);
+    }
+  }
+
+  /** מוצא אחרון: הקטנת הגופן בתא בודד, בצעדים, עד שהתוכן נכנס */
+  function shrinkCells() {
+    var cells = $('#grid').children;
+    for (var i = 0; i < cells.length; i++) {
+      var c = cells[i], k = 1;
+      while (k > 0.58 && overflowOf(c) > 0.5) {
+        k -= 0.07;
+        c.style.setProperty('--ls', k.toFixed(2));
+        c.style.setProperty('--hs', k.toFixed(2));
+        tuneLineHeights(c);
       }
     }
   }
 
-  function renderDayCard() {
-    var h = HDate.make(state.sel);
-    var info = Holidays.forDate(h, S.israel);
-    var z = Zmanim.compute(h.date, loc(), zopts());
+  /**
+   * מתאים את הלוח למסך: קודם מרחיב את השורות אל תוך המקום הפנוי, ואם גם
+   * זה אינו מספיק מצמצם — תחילה לשורת טקסט אחת, ולבסוף רק בתאים הבודדים
+   * שעדיין חורגים. כך זה עובד גם בדפדפן, שבו שורת הכתובת גוזלת גובה,
+   * וגם באפליקציה המותקנת, ובכל גודל גופן שהמשתמש בחר.
+   */
+  function fitGrid() {
+    var grid = $('#grid');
+    grid.className = 'grid';
+    tuneLineHeights();
+    for (var i = 0; i < 20 && rowH < rowCap && worstOverflow() > 0.5; i++) {
+      rowH = Math.min(rowCap, rowH + Math.ceil(worstOverflow()));
+      grid.style.setProperty('--row-h', rowH + 'px');
+    }
+    if (worstOverflow() <= 0.5) return;
+    grid.classList.add('tight');          // שורת טקסט אחת, שתי התוויות נשארות
+    tuneLineHeights();
+    if (worstOverflow() <= 0.5) return;
+    reduceCells('one');                   // ובתאים הבודדים שעדיין חורגים
+    tuneLineHeights();
+    if (worstOverflow() <= 0.5) return;
+    reduceCells('tiny');
+    shrinkCells();
+  }
+
+  /** גוף כרטיס היום — הכל חוץ משורת הזמנים, שגובהה קבוע */
+  function dayCardBody(h, info) {
     // התווית הראשית מוצגת לצד התאריך ולא בשורה נפרדת, כדי לחסוך גובה
     var sorted = info.items.slice().sort(function (a, b) {
       return (KIND_RANK[a.kind] || 9) - (KIND_RANK[b.kind] || 9);
@@ -286,18 +416,24 @@
     if (info.candles) tags.push('<span class="tag">' + esc(candleText(info.candles)) + '</span>');
     if (info.mevarchim) tags.push('<span class="tag">' + esc(HDate.moladText(h.hy, Holidays.nextMonth(h.hm, h.hy))) + '</span>');
 
-    var third = h.dow === 5 ? ['הדלקת נרות', z.candles]
-      : h.dow === 6 ? ['צאת השבת', z.tzeitShabbat] : ['צאת הכוכבים', z.tzeit];
-
-    $('#daycard').innerHTML =
-      '<div class="dc-body">' +
+    return '<div class="dc-body">' +
       '<div class="dc-head"><div class="dc-when">' +
       '<div class="dc-date">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
       '<div class="dc-greg">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
       '</div>' + (meta ? '<div class="dc-meta">' + meta + '</div>' : '') + '</div>' +
       (tags.length ? '<div class="dc-tags">' + tags.join('') + '</div>' : '') +
       omerBlock(info.omer) +
-      '</div>' +
+      '</div>';
+  }
+
+  function renderDayCard() {
+    var h = HDate.make(state.sel);
+    var info = Holidays.forDate(h, S.israel);
+    var z = Zmanim.compute(h.date, loc(), zopts());
+    var third = h.dow === 5 ? ['הדלקת נרות', z.candles]
+      : h.dow === 6 ? ['צאת השבת', z.tzeitShabbat] : ['צאת הכוכבים', z.tzeit];
+    $('#daycard').innerHTML =
+      dayCardBody(h, info) +
       '<button class="dc-times" id="go-zman">' +
       '<span class="t"><span class="k">הנץ החמה</span><br><span class="v">' + fmtTime(z.sunrise) + '</span></span>' +
       '<span class="t"><span class="k">שקיעה</span><br><span class="v">' + fmtTime(z.sunset) + '</span></span>' +
@@ -928,7 +1064,7 @@
       });
     });
 
-    window.addEventListener('resize', function () { forceDense = false; renderGrid(); });
+    window.addEventListener('resize', function () { renderGrid(); });
 
     // החלקה בין חודשים
     var x0 = null, y0 = null;
