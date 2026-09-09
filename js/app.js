@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.2.0';
+  var APP_VERSION = '1.3.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -386,18 +386,97 @@
     }
   }
 
+  /* ================= הסברים להגדרות ================= */
+  var EXPLAIN = {
+    alot: {
+      title: 'עלות השחר',
+      body: [
+        'עלות השחר הוא הרגע שבו מתחיל האור הראשון להאיר במזרח, זמן ניכר לפני הזריחה. ממנו מתחיל היום ההלכתי לעניינים שונים, וממנו מתחילים גם הצומות.',
+        'המספר קובע כמה זמן לפני הנץ מחושב הזמן. ככל שהמספר גדול יותר — הזמן מוקדם יותר, כלומר מחמיר יותר.',
+        'אפשרות במעלות מחשבת לפי גובה השמש מתחת לאופק, ולכן משתנה לפי העונה ולפי המיקום; חישוב בדקות נשאר קבוע כל השנה.'
+      ]
+    },
+    misheyakir: {
+      title: 'משיכיר',
+      body: [
+        'משיכיר הוא הזמן שבו יש כבר די אור כדי להבחין בין הצבעים, וממנו נהוג להתעטף בטלית ולהניח תפילין בשעת הדחק.',
+        'ככל שהמספר גדול יותר — הזמן מוקדם יותר ומקל יותר; מספר קטן יותר דוחה את הזמן ומחמיר.'
+      ]
+    },
+    tzeit: {
+      title: 'צאת הכוכבים',
+      body: [
+        'צאת הכוכבים הוא סוף היום ההלכתי — משעה זו מתחיל היום הבא. הוא קובע בין השאר את סיום התעניות ואת זמן תפילת ערבית.',
+        'ככל שהמספר גדול יותר — הזמן מאוחר יותר ומחמיר יותר.'
+      ]
+    },
+    shabbatEnd: {
+      title: 'צאת השבת',
+      body: [
+        'צאת השבת מאוחרת מצאת הכוכבים הרגיל, כדי להוסיף מן החול על הקודש. נהוג להמתין עוד כמה דקות מעבר לזמן המוצג.',
+        'שיטת רבנו תם, 72 דקות, היא המחמירה מכולן ונהוגה בחלק מהקהילות.'
+      ]
+    },
+    candles: {
+      title: 'הדלקת נרות',
+      body: [
+        'הדלקת הנרות נעשית לפני השקיעה, ומספר הדקות הוא מנהג המקום.',
+        'בירושלים נהוג 40 דקות לפני השקיעה, בחיפה 30, וברוב היישובים בארץ 20. בעת החלפת יישוב באפליקציה נקבע המנהג המקובל בו.'
+      ]
+    }
+  };
+  var EXPLAIN_FOOT = 'הזמנים נועדו לנוחות בלבד. כדאי לנהוג לחומרא בכמה דקות, ובשאלה למעשה יש לשאול רב.';
+
+  function openExplain(key) {
+    var e = EXPLAIN[key];
+    if (!e) return;
+    openSheet(e.title, function (body) {
+      var wrap = el('div');
+      wrap.style.cssText = 'padding: 4px 18px 22px; font-size: 14.5px; line-height: 1.6; color: var(--ink-2)';
+      e.body.forEach(function (para) {
+        var pEl = el('p', '', esc(para));
+        pEl.style.cssText = 'margin: 12px 0';
+        wrap.appendChild(pEl);
+      });
+      var foot = el('p', '', esc(EXPLAIN_FOOT));
+      foot.style.cssText = 'margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line);' +
+        'font-size: 13px; color: var(--muted)';
+      wrap.appendChild(foot);
+      body.appendChild(wrap);
+    });
+  }
+
   /* ================= הגדרות ================= */
-  function selectRow(title, sub, options, current, onChange) {
+  function selectRow(title, sub, options, current, onChange, infoKey) {
     var row = el('div', 'setting');
+    var txt = el('div', 'txt');
+    var head = el('div', 't');
+    head.appendChild(document.createTextNode(title));
+    if (infoKey) {
+      var info = el('button', 'info', '?');
+      info.setAttribute('aria-label', 'מה זה ' + title);
+      info.addEventListener('click', function (ev) { ev.stopPropagation(); openExplain(infoKey); });
+      head.appendChild(info);
+    }
+    var hintEl = el('div', 's');
+    txt.appendChild(head); txt.appendChild(hintEl);
+
     var sel = el('select');
     options.forEach(function (o) { sel.appendChild(new Option(o.label, o.value)); });
     sel.value = current;
-    sel.addEventListener('change', function () { onChange(sel.value); });
-    row.innerHTML = '<div class="txt"><div class="t">' + esc(title) + '</div>' +
-      (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + '</div>';
+    function showHint() {
+      var cur = null;
+      options.forEach(function (o) { if (String(o.value) === String(sel.value)) cur = o; });
+      hintEl.textContent = (cur && cur.hint) || sub || '';
+    }
+    showHint();
+    sel.addEventListener('change', function () { showHint(); onChange(sel.value); });
+
+    row.appendChild(txt);
     row.appendChild(sel);
     return row;
   }
+
   function switchRow(title, sub, on, onChange) {
     var row = el('div', 'setting');
     row.innerHTML = '<div class="txt"><div class="t">' + esc(title) + '</div>' +
@@ -410,7 +489,7 @@
     return row;
   }
   function opts2(arr) {
-    return arr.map(function (o) { return { label: o.label, value: o.id }; });
+    return arr.map(function (o) { return { label: o.label, value: o.id, hint: o.hint }; });
   }
 
   function renderSettings() {
@@ -421,20 +500,34 @@
     var m = $('#set-methods');
     m.innerHTML = '';
     m.appendChild(selectRow('עלות השחר', 'תחילת היום ההלכתי', opts2(Zmanim.ALOT_OPTS), S.alot,
-      function (v) { S.alot = v; save(); renderZman(); }));
+      function (v) { S.alot = v; save(); renderZman(); }, 'alot'));
     m.appendChild(selectRow('משיכיר', 'זמן טלית ותפילין', opts2(Zmanim.MISHEYAKIR_OPTS), S.misheyakir,
-      function (v) { S.misheyakir = v; save(); renderZman(); }));
-    m.appendChild(selectRow('צאת הכוכבים', '', opts2(Zmanim.TZEIT_OPTS), S.tzeit,
-      function (v) { S.tzeit = v; save(); renderZman(); renderCal(); }));
+      function (v) { S.misheyakir = v; save(); renderZman(); }, 'misheyakir'));
+    m.appendChild(selectRow('צאת הכוכבים', 'סוף היום ההלכתי', opts2(Zmanim.TZEIT_OPTS), S.tzeit,
+      function (v) { S.tzeit = v; save(); renderZman(); renderCal(); }, 'tzeit'));
     m.appendChild(selectRow('צאת השבת', '', opts2(Zmanim.SHABBAT_END_OPTS), S.shabbatEnd,
-      function (v) { S.shabbatEnd = v; save(); renderZman(); renderCal(); }));
+      function (v) { S.shabbatEnd = v; save(); renderZman(); renderCal(); }, 'shabbatEnd'));
     m.appendChild(selectRow('הדלקת נרות', 'דקות לפני השקיעה',
-      Zmanim.CANDLE_OPTS.map(function (n) { return { label: n + ' דקות', value: n }; }), S.candles,
-      function (v) { S.candles = +v; save(); renderZman(); renderCal(); }));
+      Zmanim.CANDLE_OPTS.map(function (n) {
+        return { label: n + ' דקות', value: n, hint: Zmanim.CANDLE_HINTS[n] };
+      }), S.candles,
+      function (v) { S.candles = +v; save(); renderZman(); renderCal(); }, 'candles'));
     m.appendChild(switchRow('התחשבות בגובה המקום', 'ברירת המחדל: חישוב בגובה פני הים', S.useElevation,
       function (v) { S.useElevation = v; save(); renderZman(); renderCal(); renderSettings(); }));
     m.appendChild(switchRow('ארץ ישראל', 'יום טוב אחד; בחו״ל — יום טוב שני של גלויות', S.israel,
       function (v) { S.israel = v; save(); renderAll(); }));
+
+    var reset = el('button', 'setting');
+    reset.innerHTML = '<div class="txt"><div class="t" style="color:var(--accent)">איפוס שיטות החישוב</div>' +
+      '<div class="s">חזרה לברירות המחדל המקובלות בארץ</div></div>';
+    reset.addEventListener('click', function () {
+      S.alot = DEFAULTS.alot; S.misheyakir = DEFAULTS.misheyakir;
+      S.tzeit = DEFAULTS.tzeit; S.shabbatEnd = DEFAULTS.shabbatEnd;
+      S.useElevation = DEFAULTS.useElevation;
+      S.candles = S.locName === 'ירושלים' ? 40 : S.locName === 'חיפה' ? 30 : 20;
+      save(); renderAll();
+    });
+    m.appendChild(reset);
 
     var d = $('#set-display');
     d.innerHTML = '';
