@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.5.0';
+  var APP_VERSION = '1.6.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -438,10 +438,6 @@
       ]
     }
   };
-  var EXPLAIN_DIRECTION = 'מוקדם או מאוחר אינו זהה למחמיר או מקל. לכל זמן יש כמה ' +
-    'השלכות, ולעיתים לכיוונים מנוגדים: עלות השחר מוקדמת מקדימה את תחילת הצום, ' +
-    'ובאותה מידה מקדימה גם את הזמן שממנו אפשר לקיים מצוות שזמנן ביום. לכן נכון ' +
-    'לבחור לפי הפסק שנוהגים בו, ולא לפי מה שנראה "מחמיר יותר".';
   var EXPLAIN_FOOT = 'הזמנים נועדו לנוחות בלבד, ובשאלה למעשה יש לשאול רב.';
 
   function openExplain(key) {
@@ -455,11 +451,6 @@
         pEl.style.cssText = 'margin: 12px 0';
         wrap.appendChild(pEl);
       });
-      var dir = el('p', '', esc(EXPLAIN_DIRECTION));
-      dir.style.cssText = 'margin: 16px 0 0; padding: 12px 14px; border-radius: var(--radius-sm);' +
-        'background: var(--surface-2); font-size: 13.5px';
-      wrap.appendChild(dir);
-
       var foot = el('p', '', esc(EXPLAIN_FOOT));
       foot.style.cssText = 'margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line);' +
         'font-size: 13px; color: var(--muted)';
@@ -527,7 +518,7 @@
       function (v) { S.misheyakir = v; save(); renderZman(); }, 'misheyakir'));
     m.appendChild(selectRow('צאת הכוכבים', 'סוף היום ההלכתי', opts2(Zmanim.TZEIT_OPTS), S.tzeit,
       function (v) { S.tzeit = v; save(); renderZman(); renderCal(); }, 'tzeit'));
-    m.appendChild(selectRow('צאת השבת', '', opts2(Zmanim.SHABBAT_END_OPTS), S.shabbatEnd,
+    m.appendChild(selectRow('צאת השבת', 'סיום השבת והמועדים', opts2(Zmanim.SHABBAT_END_OPTS), S.shabbatEnd,
       function (v) { S.shabbatEnd = v; save(); renderZman(); renderCal(); }, 'shabbatEnd'));
     m.appendChild(selectRow('הדלקת נרות', 'דקות לפני השקיעה',
       Zmanim.CANDLE_OPTS.map(function (n) {
