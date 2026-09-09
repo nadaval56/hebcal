@@ -188,78 +188,38 @@
     var info = Holidays.forDate(h, S.israel);
     var z = Zmanim.compute(h.date, loc(), zopts());
     var up = Holidays.upcomingShabbat(state.sel, S.israel);
-    var c = $('#daycard');
+
     var tags = [];
     info.items.forEach(function (it) {
-      var cls = it.kind === 'yomtov' ? ' yomtov' : it.kind === 'fast' ? ' fast' : it.kind === 'modern' ? ' modern' : '';
+      var cls = it.kind === 'yomtov' ? ' yomtov' : it.kind === 'fast' ? ' fast' : '';
       tags.push('<span class="tag' + cls + '">' + esc(it.name) + '</span>');
     });
     if (info.special) tags.push('<span class="tag">' + esc(info.special) + '</span>');
-    if (info.mevarchim) tags.push('<span class="tag">שבת מברכים</span>');
     if (info.omer) tags.push('<span class="tag">' + esc('עומר: יום ' + info.omer) + '</span>');
     if (info.candles) tags.push('<span class="tag">' + esc(candleText(info.candles)) + '</span>');
     if (info.mevarchim) tags.push('<span class="tag">' + esc(HDate.moladText(h.hy, Holidays.nextMonth(h.hm, h.hy))) + '</span>');
 
-    var parName = info.parasha ? ('פרשת ' + info.parasha.name) : (up ? up.label : '');
-    c.innerHTML =
-      '<div class="card-pad">' +
-      '<div class="row"><div>' +
-      '<div class="hd">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
-      '<div class="gd">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
-      '</div>' +
-      (parName ? '<div class="par">' + esc(parName) + '</div>' : '') +
-      '</div>' +
-      (tags.length ? '<div class="tags">' + tags.join('') + '</div>' : '') +
-      '<div class="quick">' +
-      '<div><div class="k">הנץ החמה</div><div class="v">' + fmtTime(z.sunrise) + '</div></div>' +
-      '<div><div class="k">שקיעה</div><div class="v">' + fmtTime(z.sunset) + '</div></div>' +
-      '<div><div class="k">' + (h.dow === 5 ? 'הדלקת נרות' : h.dow === 6 ? 'צאת שבת' : 'צאת הכוכבים') + '</div>' +
-      '<div class="v">' + fmtTime(h.dow === 5 ? z.candles : h.dow === 6 ? z.tzeitShabbat : z.tzeit) + '</div></div>' +
-      '</div>' +
-      '<button id="go-zman" style="margin-top:14px;width:100%;padding:11px;background:none;' +
-      'border:1px solid rgba(255,255,255,.25);color:inherit;font-size:14px;font-weight:500;border-radius:12px">כל זמני היום ←</button>' +
-      '</div>';
-    $('#go-zman').addEventListener('click', function () {
-      state.zman = state.sel; go('zman');
-    });
-  }
+    var par = info.parasha ? ('פרשת ' + info.parasha.name) : (up ? up.label : '');
+    var third = h.dow === 5 ? ['הדלקת נרות', z.candles]
+      : h.dow === 6 ? ['צאת השבת', z.tzeitShabbat] : ['צאת הכוכבים', z.tzeit];
 
-  /** אירועים קרובים */
-  function renderUpcoming() {
-    var box = $('#upcoming');
-    box.innerHTML = '';
-    var start = todayAbs(), found = 0;
-    var SHOW = { yomtov: 1, fast: 1, modern: 1, minor: 1 };
-    for (var a = start; a < start + 400 && found < 7; a++) {
-      var h = HDate.make(a);
-      var items = Holidays.holidaysFor(h.hy, h.hm, h.hd, S.israel);
-      var pick = null;
-      items.forEach(function (it) {
-        if (SHOW[it.kind] && !pick) pick = it;
-        if (it.kind === 'chanukah' && it.name.indexOf('נר 1') > -1 && !pick) pick = { name: 'חנוכה', kind: 'minor' };
-      });
-      if (!pick) continue;
-      if (pick.name.indexOf('יום ב׳') > -1) continue;
-      found++;
-      var days = a - start;
-      var row = el('div', 'item');
-      row.innerHTML = '<div class="txt"><div class="t">' + esc(pick.name) + '</div>' +
-        '<div class="s">' + esc(h.dayHebMarks + ' ' + h.monthName + ' · ' + HDate.DAY_NAMES[h.dow] + ', ' + gregStr(h, true)) + '</div></div>' +
-        '<div class="val" style="font-size:13px;color:var(--muted);white-space:nowrap">' +
-        (days === 0 ? 'היום' : days === 1 ? 'מחר' : 'בעוד ' + days + ' ימים') + '</div>';
-      (function (abs) {
-        row.addEventListener('click', function () { state.sel = abs; resetAnchor(abs); renderCal(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
-      })(a);
-      box.appendChild(row);
-    }
-    if (!found) box.appendChild(el('div', 'empty', 'אין אירועים קרובים'));
+    $('#daycard').innerHTML =
+      '<div class="dc-head"><div>' +
+      '<div class="dc-date">' + esc(h.dayHebMarks + ' ' + h.monthName + ' ' + h.yearHeb) + '</div>' +
+      '<div class="dc-greg">' + esc(HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true)) + '</div>' +
+      '</div>' + (par ? '<div class="dc-par">' + esc(par) + '</div>' : '') + '</div>' +
+      (tags.length ? '<div class="dc-tags">' + tags.join('') + '</div>' : '') +
+      '<button class="dc-times" id="go-zman">' +
+      '<span class="t"><span class="k">הנץ החמה</span><br><span class="v">' + fmtTime(z.sunrise) + '</span></span>' +
+      '<span class="t"><span class="k">שקיעה</span><br><span class="v">' + fmtTime(z.sunset) + '</span></span>' +
+      '<span class="t"><span class="k">' + esc(third[0]) + '</span><br><span class="v">' + fmtTime(third[1]) + '</span></span>' +
+      '<svg class="chev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>' +
+      '</button>';
+    $('#go-zman').addEventListener('click', function () { state.zman = state.sel; go('zman'); });
   }
 
   function renderCal() {
-    renderGrid(); renderDayCard(); renderUpcoming();
-    $('#act-mode').innerHTML = '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/>' +
-      '<path d="M8 3v4M16 3v4M3 10h18"/></svg>' +
-      (S.calMode === 'greg' ? 'מעבר לחודש עברי' : 'מעבר לחודש לועזי');
+    renderGrid(); renderDayCard();
   }
 
   function shiftMonth(dir) {
@@ -689,7 +649,9 @@
     $$('.tabbar button').forEach(function (b) { b.classList.toggle('active', b.dataset.view === view); });
     $('#page-title').textContent = TITLES[view];
     $('#btn-jump').classList.toggle('hidden', view === 'conv' || view === 'set');
-    window.scrollTo(0, 0);
+    $('#act-print').classList.toggle('hidden', view !== 'cal');
+    var v = $('#view-' + view);
+    if (v) v.scrollTop = 0;
     if (view === 'zman') renderZman();
     if (view === 'conv') renderConv();
     if (view === 'set') renderSettings();

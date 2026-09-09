@@ -32,6 +32,7 @@
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
   <symbol id="i-candle" viewBox="0 0 24 24"><path d="M9 21h6M12 21v-3M9 18h6v-7a3 3 0 0 0-6 0z"/><path d="M12 8V5c0-1 1-1.5 1-2.5"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.6 4.5h5.2l-2.6 4.5 2.6 4.5h-5.2L12 21l-2.6-4.5H4.2l2.6-4.5-2.6-4.5h5.2z"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 9V4h12v5M6 18H4v-6h16v6h-2M8 14h8v6H8z"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v13M12 3 8 7M12 3l4 4M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></symbol>
 </svg>
 
@@ -40,6 +41,7 @@
     <div class="topbar-inner">
       <button class="loc-btn" id="btn-loc" title="מיקום"><svg><use href="#i-pin"/></svg><span id="topbar-loc"></span></button>
       <h1 id="page-title">לוח</h1>
+      <button class="icon-btn" id="act-print" title="הדפסת החודש"><svg><use href="#i-print"/></svg></button>
       <button class="pill" id="btn-jump">היום</button>
     </div>
   </header>
@@ -54,17 +56,11 @@
       </div>
       <div class="weekdays"><div>א׳</div><div>ב׳</div><div>ג׳</div><div>ד׳</div><div>ה׳</div><div>ו׳</div><div>שבת</div></div>
       <div class="grid" id="grid"></div>
-      <div class="card daycard" id="daycard"></div>
-      <div class="section-title">אירועים קרובים</div>
-      <div class="card"><div class="list" id="upcoming"></div></div>
-      <div class="actions">
-        <button id="act-mode"></button>
-        <button id="act-print"><svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4v-6h16v6h-2M8 14h8v7H8z"/></svg>הדפסת החודש</button>
-      </div>
+      <div class="daycard" id="daycard"></div>
     </section>
 
     <!-- זמני היום -->
-    <section class="view" id="view-zman">
+    <section class="view scroll" id="view-zman">
       <div class="hero">
         <div class="date-nav">
           <button id="z-prev" aria-label="יום קודם"><svg><use href="#i-next"/></svg></button>
@@ -85,7 +81,7 @@
     </section>
 
     <!-- ממיר תאריכים -->
-    <section class="view" id="view-conv">
+    <section class="view scroll" id="view-conv">
       <div class="card">
         <div class="field">
           <label>תאריך לועזי</label>
@@ -106,7 +102,7 @@
     </section>
 
     <!-- הגדרות -->
-    <section class="view" id="view-set">
+    <section class="view scroll" id="view-set">
       <div class="section-title">מיקום</div>
       <div class="card">
         <button class="setting" id="set-loc" style="width:100%;text-align:start">
