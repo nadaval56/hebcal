@@ -301,6 +301,20 @@ var Holidays = (function (H) {
     return s + ' לעומר';
   }
 
+  /**
+   * שתי ספירות העומר הנוגעות ליום אזרחי אחד:
+   * day     — הספירה שנספרה אמש וחלה כל היום
+   * tonight — הספירה שייספרו הערב, עם צאת הכוכבים
+   */
+  function omerFor(hy, hm, hd) {
+    var abs = H.hebToAbs(hy, hm, hd);
+    var next = H.absToHeb(abs + 1);
+    return {
+      day: omerDay(hy, hm, hd),
+      tonight: omerDay(next.y, next.m, next.d)
+    };
+  }
+
   /** שבתות מיוחדות */
   function specialShabbat(hy, hm, hd, israel) {
     var abs = H.hebToAbs(hy, hm, hd);
@@ -335,7 +349,7 @@ var Holidays = (function (H) {
       items: items,
       special: sp,
       parasha: par,
-      omer: omerDay(hd_.hy, hd_.hm, hd_.hd),
+      omer: omerFor(hd_.hy, hd_.hm, hd_.hd),
       candles: chanukahCandles(hd_.hy, hd_.hm, hd_.hd),
       mevarchim: isShabbatMevarchim(hd_.hy, hd_.hm, hd_.hd)
     };
@@ -349,7 +363,7 @@ var Holidays = (function (H) {
     holidaysFor: holidaysFor,
     specialShabbat: specialShabbat,
     isShabbatMevarchim: isShabbatMevarchim, nextMonth: nextMonth,
-    omerDay: omerDay, omerText: omerText, omerDaysPhrase: omerDaysPhrase,
+    omerDay: omerDay, omerText: omerText, omerDaysPhrase: omerDaysPhrase, omerFor: omerFor,
     yomHaatzmautAbs: yomHaatzmautAbs,
     shabbatotOfYear: shabbatotOfYear,
     forDate: forDate
