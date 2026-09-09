@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.7.0';
+  var APP_VERSION = '1.8.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -156,14 +156,14 @@
   }
 
   var MIN_CARD_H = 132;   // גובה מזערי לכרטיס היום
-  var CARD_RESERVE = 190; // מקום קבוע שנשמר לכרטיס, ללא תלות בתוכנו
-  var RATIO_MIN = 1.10;   // גובה שורה מזערי ביחס לרוחב העמודה
-  var RATIO_MAX = 1.45;   // וגובה מרבי, כדי שהתא יישאר ריבועי למדי
+  var CARD_MAX_H = 274;   // גובה הכרטיס ביום העמוס ביותר (ספירת העומר עם תגיות)
+  var MIN_CELL_H = 50;    // גובה תא מזערי שבו התוכן עדיין נכנס
+  var CELL_RATIO = 1.0;   // תא ריבועי: גובה השורה כרוחב העמודה
 
   /**
-   * קובע את גובה שורות הלוח לפי רוחב העמודה והמקום הפנוי בלבד.
-   * המקום שנשמר לכרטיס היום הוא קבוע, ולכן כמות הטקסט בכרטיס אינה
-   * משפיעה על גובה השורות, והוא נשאר זהה בכל ימי החודש.
+   * קובע את גובה שורות הלוח מרוחב העמודה ומהמקום הפנוי בלבד — לעולם לא
+   * מכמות התוכן בכרטיס — כך שהגובה זהה בכל ימי החודש.
+   * השורות ריבועיות, ומצטמצמות רק אם אין די מקום לכרטיס ביומו העמוס.
    */
   function sizeGrid(rows) {
     var grid = $('#grid');
@@ -171,9 +171,9 @@
     if (!w || !rows) return;
     var col = w / 7;
     var avail = $('#view-cal').clientHeight - $('.month-nav').offsetHeight - $('.weekdays').offsetHeight;
-    var fill = (avail - CARD_RESERVE) / rows;
-    var h = Math.max(col * RATIO_MIN, Math.min(col * RATIO_MAX, fill));
-    h = Math.min(h, (avail - MIN_CARD_H) / rows);
+    var h = Math.min(col * CELL_RATIO, (avail - CARD_MAX_H) / rows);
+    h = Math.max(h, MIN_CELL_H);                      // שמירה על קריאות התא
+    h = Math.min(h, (avail - MIN_CARD_H) / rows);     // ובכל זאת בלי גלילה במסך
     grid.style.setProperty('--row-h', Math.floor(Math.max(h, 34)) + 'px');
   }
 
