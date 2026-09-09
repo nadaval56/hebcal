@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.10.1';
+  var APP_VERSION = '1.12.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -11,6 +11,7 @@
   var DEFAULTS = {
     locName: 'ירושלים', lat: 31.7683, lng: 35.2137, elevation: 754, tz: 'Asia/Jerusalem',
     israel: true, theme: 'auto', calMode: 'greg', showParasha: true, isGps: false,
+    evShow: true, evEdit: false,
     alot: '72', misheyakir: '45', tzeit: '25', shabbatEnd: '35', candles: 40, useElevation: false
   };
   var S = load();
@@ -20,7 +21,12 @@
     for (var k in DEFAULTS) o[k] = DEFAULTS[k];
     try {
       var raw = localStorage.getItem('luach.settings');
-      if (raw) { var p = JSON.parse(raw); for (var j in p) if (j in DEFAULTS) o[j] = p[j]; }
+      if (raw) {
+        var p = JSON.parse(raw);
+        for (var j in p) if (j in DEFAULTS) o[j] = p[j];
+        // תאימות לאחור: פעם היה מתג אחד לאירועים, והוא שלט גם בכתיבה וגם בתצוגה
+        if (typeof p.events === 'boolean' && typeof p.evEdit !== 'boolean') o.evEdit = p.events;
+      }
     } catch (e) { }
     return o;
   }
@@ -59,8 +65,80 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
+  /* ================= אירועים אישיים ================= */
+  /* נשמרים במכשיר בלבד (localStorage), לצד ההגדרות. אין שרת ואין סנכרון:
+     מחיקת נתוני האתר בדפדפן מוחקת גם אותם. המפתח הוא התאריך הלועזי, כדי
+     שלא יהיה תלוי בחישוב העברי ויישאר קריא גם בגיבוי ידני. */
+  var EV_MAX_TEXT = 80;   // אורך מרבי לתיאור — שומר על רוחב השבב בכרטיס
+  var EV_CARD_MAX = 3;    // מספר השבבים בכרטיס היום; מעבר לזה — שבב «עוד N»
+  var EV = evLoad();
+  var evRev = 0;          // עולה בכל שינוי; חלק ממפתח המטמון של measureCard
+
+  /**
+   * שני שערים נפרדים, ושניהם אינם נוגעים בנתונים השמורים:
+   *   evVisible  — האם האירועים מוצגים בלוח, בכרטיס היום ובהדפסה.
+   *   evWritable — האם מותר להוסיף, לערוך ולמחוק.
+   * כתיבה מותנית בתצוגה: אין טעם להוסיף אירוע שאינו נראה. ההעדפה עצמה
+   * נשמרת כפי שהמשתמש קבע, וחוזרת לפעול ברגע שהאירועים מוצגים שוב.
+   */
+  function evVisible() { return !!S.evShow; }
+  function evWritable() { return !!(S.evShow && S.evEdit); }
+
+  function evLoad() {
+    try {
+      var o = JSON.parse(localStorage.getItem('luach.events') || '{}');
+      return (o && typeof o === 'object' && !(o instanceof Array)) ? o : {};
+    } catch (e) { return {}; }
+  }
+  function evSave() {
+    evRev++;
+    try { localStorage.setItem('luach.events', JSON.stringify(EV)); } catch (e) { }
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function evKey(abs) {
+    var h = HDate.make(abs);
+    return h.gy + '-' + pad2(h.gm) + '-' + pad2(h.gd);
+  }
+  /** אירועי היום, ממוינים לפי שעה; אירוע בלי שעה בא בסוף */
+  function evList(abs) {
+    var a = EV[evKey(abs)];
+    if (!a || !(a instanceof Array) || !a.length) return [];
+    return a.slice().sort(function (x, y) {
+      var ta = x.time || '99:99', tb = y.time || '99:99';
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
+  }
+  function evFind(abs, id) {
+    var found = null;
+    evList(abs).forEach(function (e) { if (e.id === id) found = e; });
+    return found;
+  }
+  function evCount() {
+    var n = 0;
+    for (var k in EV) if (EV[k] && EV[k].length) n += EV[k].length;
+    return n;
+  }
+  function evId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+  function evPut(abs, ev) {
+    var k = evKey(abs);
+    if (!(EV[k] instanceof Array)) EV[k] = [];
+    var a = EV[k], at = -1;
+    a.forEach(function (x, i) { if (x.id === ev.id) at = i; });
+    if (at >= 0) a[at] = ev; else a.push(ev);
+    evSave();
+  }
+  function evDel(abs, id) {
+    var k = evKey(abs);
+    if (!(EV[k] instanceof Array)) return;
+    EV[k] = EV[k].filter(function (x) { return x.id !== id; });
+    if (!EV[k].length) delete EV[k];
+    evSave();
+  }
+
   /** עד שתי תוויות ליום: מועדים לפי חשיבות, ואז פרשה או שבת מיוחדת */
-  function dayLabels(info) {
+  function dayLabels(info, abs) {
     var out = [];
     info.items.slice().sort(function (a, b) {
       return (KIND_RANK[a.kind] || 9) - (KIND_RANK[b.kind] || 9);
@@ -70,6 +148,11 @@
         cls: it.kind === 'fast' ? 'fast' : it.kind === 'modern' ? 'modern' : ''
       });
     });
+    // אירוע אישי קודם לפרשה: הוא הדבר שהמשתמש עצמו הוסיף ללוח
+    if (evVisible()) {
+      var evs = evList(abs);
+      if (evs.length) out.push({ text: evs[0].text, cls: 'evt' });
+    }
     if (S.showParasha && info.parasha) out.push({ text: shortName(info.parasha.name), cls: 'par' });
     if (info.special) out.push({ text: info.special, cls: 'par' });
     return out.slice(0, 2);
@@ -186,7 +269,8 @@
     var w = card.offsetWidth;
     if (!w) return CARD_MAX_H;
     var key = cells[0].abs + ':' + cells[cells.length - 1].abs + ':' + w + ':' +
-      S.israel + ':' + S.showParasha + ':' + window.innerHeight;
+      S.israel + ':' + S.showParasha + ':' + S.evShow + ':' + S.evEdit + ':' + evRev +
+      ':' + window.innerHeight;
     if (key === cardKey) return cardReserve;
     cardKey = key;
     if (!cardProbe) {
@@ -258,17 +342,28 @@
     cells.forEach(function (c) {
       var h = HDate.make(c.abs);
       var info = Holidays.forDate(h, S.israel);
-      var labels = dayLabels(info);
+      var labels = dayLabels(info, c.abs);
+      // ביום עמוס נדחקת תווית האירוע החוצה; אז מסמנים את התא בנקודה, כדי
+      // שלעולם לא ייעלם סימן לאירוע שהמשתמש הוסיף
+      var evHidden = false;
+      if (evVisible() && evList(c.abs).length) {
+        evHidden = true;
+        labels.forEach(function (l) { if (l.cls === 'evt') evHidden = false; });
+      }
       var cell = el('div', 'cell' + (c.out ? ' out' : '') + (h.dow === 6 ? ' shabbat' : '') +
         (c.abs === tAbs ? ' today' : '') + (c.abs === state.sel ? ' sel' : '') +
-        (labels.length > 1 ? ' multi' : ''));
+        (labels.length > 1 ? ' multi' : '') + (evHidden ? ' evdot' : ''));
       cell.appendChild(el('div', 'g', String(h.gd)));
       cell.appendChild(el('div', 'h', h.dayHeb));
       labels.forEach(function (l) {
         cell.appendChild(el('div', 'lbl' + (l.cls ? ' ' + l.cls : '') +
           (l.text.length > 9 ? ' long' : ''), esc(l.text)));
       });
-      cell.addEventListener('click', function () { state.sel = c.abs; renderCal(); });
+      cell.addEventListener('click', function () {
+        // לחיצה חוזרת על היום שכבר נבחר פותחת הוספת אירוע — רק כשהכתיבה מותרת
+        if (evWritable() && c.abs === state.sel) { openEventEditor(c.abs, null); return; }
+        state.sel = c.abs; renderCal();
+      });
       grid.appendChild(cell);
     });
     fitGrid();
@@ -284,6 +379,33 @@
         esc(Holidays.omerText(omer.tonight)) + '</div>';
     }
     return html + '</div>';
+  }
+
+  /**
+   * שורת האירועים בכרטיס היום. מספר השבבים חסום (EV_CARD_MAX) כדי שהכרטיס
+   * לא יגדל עם מספר האירועים ויכווץ את תאי הלוח; השאר נפתחים בחלון נפרד.
+   * בלי הרשאת כתיבה אין שבב הוספה, ולכן ביום ריק אין שורה כלל.
+   */
+  function eventsBlock(abs) {
+    if (!evVisible()) return '';
+    var list = evList(abs);
+    if (!list.length && !evWritable()) return '';
+    var shown = list.length > EV_CARD_MAX ? EV_CARD_MAX - 1 : list.length;
+    var chips = [];
+    for (var i = 0; i < shown; i++) {
+      chips.push('<button class="tag ev" data-ev="' + esc(list[i].id) + '">' +
+        (list[i].time ? '<span class="hh">' + esc(list[i].time) + '</span>' : '') +
+        '<span class="tx">' + esc(list[i].text) + '</span></button>');
+    }
+    if (list.length > shown) {
+      chips.push('<button class="tag ev more" data-ev-all="1">עוד ' +
+        (list.length - shown) + '</button>');
+    }
+    if (evWritable()) {
+      chips.push('<button class="tag ev add" data-ev-add="1">' +
+        '<span class="pl">+</span><span class="tx">אירוע</span></button>');
+    }
+    return '<div class="dc-events">' + chips.join('') + '</div>';
   }
 
   var inkProbe = null;
@@ -423,6 +545,7 @@
       '</div>' + (meta ? '<div class="dc-meta">' + meta + '</div>' : '') + '</div>' +
       (tags.length ? '<div class="dc-tags">' + tags.join('') + '</div>' : '') +
       omerBlock(info.omer) +
+      eventsBlock(h.abs) +
       '</div>';
   }
 
@@ -441,9 +564,26 @@
       '<svg class="chev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>' +
       '</button>';
     $('#go-zman').addEventListener('click', function () { state.zman = state.sel; go('zman'); });
+
+    var card = $('#daycard'), abs = state.sel;
+    $$('[data-ev]', card).forEach(function (b) {
+      b.addEventListener('click', function () {
+        // בלי הרשאת כתיבה השבב עדיין נפתח — לקריאת התיאור המלא, בלי עריכה
+        if (!evWritable()) { openDayEvents(abs); return; }
+        openEventEditor(abs, evFind(abs, b.getAttribute('data-ev')));
+      });
+    });
+    var add = $('[data-ev-add]', card);
+    if (add) add.addEventListener('click', function () { openEventEditor(abs, null); });
+    var all = $('[data-ev-all]', card);
+    if (all) all.addEventListener('click', function () { openDayEvents(abs); });
   }
 
   function renderCal() {
+    // מסמן את המצב על שורש המסמך: כך ההידוק לצורך שורת האירועים במסכים
+    // נמוכים חל רק כשהשורה באמת מוצגת, ולכן הלוח הרגיל אינו משתנה
+    document.documentElement.dataset.events =
+      (evVisible() && (evWritable() || evCount())) ? '1' : '0';
     renderGrid(); renderDayCard();
   }
 
@@ -764,8 +904,36 @@
     d.appendChild(selectRow('תצוגת הלוח', '', [
       { label: 'חודש לועזי', value: 'greg' }, { label: 'חודש עברי', value: 'heb' }
     ], S.calMode, function (v) { S.calMode = v; save(); resetAnchor(state.sel); renderCal(); }));
-    d.appendChild(switchRow('הצגת פרשת השבוע בלוח', '', S.showParasha,
+    d.appendChild(switchRow('הצגת פרשת השבוע בלוח', 'בתאי הלוח ובהדפסה', S.showParasha,
       function (v) { S.showParasha = v; save(); renderCal(); }));
+
+    // שתי ההגדרות נפרדות, ואף אחת מהן אינה נוגעת באירועים השמורים
+    var ev = $('#set-events');
+    ev.innerHTML = '';
+    ev.appendChild(switchRow('הצגת אירועים בלוח',
+      'בלוח, בכרטיס היום ובהדפסה. הסתרה אינה מוחקת דבר.',
+      S.evShow, function (v) { S.evShow = v; save(); renderCal(); renderSettings(); }));
+    var editRow = switchRow('אפשר הוספה ועריכה',
+      S.evShow ? 'הוספה, עריכה ומחיקה של אירועים'
+        : 'לא פעיל בזמן שהאירועים מוסתרים',
+      S.evEdit, function (v) { S.evEdit = v; save(); renderCal(); renderSettings(); });
+    if (!S.evShow) editRow.style.opacity = '.55';
+    ev.appendChild(editRow);
+    if (evCount()) {
+      var wipe = el('button', 'setting');
+      wipe.innerHTML = '<div class="txt"><div class="t" style="color:var(--fast)">מחיקת כל האירועים</div>' +
+        '<div class="s">' + evCount() + ' אירועים שמורים במכשיר</div></div>';
+      wipe.addEventListener('click', function () {
+        if (!confirm('למחוק את כל האירועים השמורים? הפעולה אינה הפיכה.')) return;
+        EV = {};
+        evSave();
+        renderCal();
+        renderSettings();
+      });
+      ev.appendChild(wipe);
+    }
+    $('#events-note').textContent = 'האירועים נשמרים במכשיר בלבד, ואינם נמחקים ' +
+      'בעדכון גרסה של האפליקציה. ניקוי נתוני הדפדפן מוחק אותם.';
 
     $('#about').innerHTML =
       'לוח · לוח שנה עברי וזמני היום<br>' +
@@ -888,6 +1056,116 @@
     });
   }
 
+  /* ================= חלונות האירועים ================= */
+  function evDateLine(h) {
+    return h.dayHebMarks + ' ' + h.monthName + ' · ' +
+      HDate.DAY_NAMES_FULL[h.dow] + ', ' + gregStr(h, true);
+  }
+
+  /** הוספה או עריכה של אירוע בודד */
+  function openEventEditor(abs, ev) {
+    // הגנה: בלי הרשאת כתיבה אין עריכה, וכשהאירועים מוסתרים גם אין מה להציג
+    if (!evWritable()) { if (evVisible()) openDayEvents(abs); return; }
+    var isNew = !ev;
+    var cur = ev || { id: '', text: '', time: '' };
+    var h = HDate.make(abs);
+    openSheet(isNew ? 'אירוע חדש' : 'עריכת אירוע', function (body) {
+      body.appendChild(el('div', 'group-head', esc(evDateLine(h))));
+
+      var card = el('div', 'card');
+      var f1 = el('div', 'field', '<label>תיאור</label>');
+      var input = el('input');
+      input.type = 'text';
+      input.maxLength = EV_MAX_TEXT;
+      input.placeholder = 'יום הולדת, יארצייט, פגישה…';
+      input.value = cur.text;
+      f1.appendChild(input);
+      card.appendChild(f1);
+
+      var f2 = el('div', 'field', '<label>שעה — לא חובה</label>');
+      var time = el('input');
+      time.type = 'time';
+      time.value = cur.time || '';
+      f2.appendChild(time);
+      card.appendChild(f2);
+      body.appendChild(card);
+
+      var btns = el('div', 'btn-row');
+      var ok = el('button', 'btn-main', isNew ? 'הוספה' : 'שמירה');
+      ok.addEventListener('click', function () {
+        var text = input.value.replace(/\s+/g, ' ').trim().slice(0, EV_MAX_TEXT);
+        if (!text) { input.focus(); return; }
+        evPut(abs, {
+          id: cur.id || evId(), text: text,
+          time: /^\d{1,2}:\d{2}$/.test(time.value) ? time.value : ''
+        });
+        closeSheet();
+        state.sel = abs;
+        renderCal();
+      });
+      btns.appendChild(ok);
+      if (!isNew) {
+        var del = el('button', 'btn-danger', 'מחיקה');
+        del.addEventListener('click', function () {
+          if (!confirm('למחוק את האירוע «' + cur.text + '»?')) return;
+          evDel(abs, cur.id);
+          closeSheet();
+          renderCal();
+        });
+        btns.appendChild(del);
+      }
+      body.appendChild(btns);
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); ok.click(); }
+      });
+      setTimeout(function () { input.focus(); }, 250);
+    });
+  }
+
+  /**
+   * כל אירועי היום — נפתח מן השבב «עוד N», ובלי הרשאת כתיבה גם מכל שבב.
+   * בלי הרשאת כתיבה זו רשימה לקריאה בלבד: אין מחיקה ואין הוספה.
+   */
+  function openDayEvents(abs) {
+    var h = HDate.make(abs);
+    var may = evWritable();
+    openSheet('אירועי היום', function (body) {
+      body.appendChild(el('div', 'group-head', esc(evDateLine(h))));
+      var list = evList(abs);
+      var card = el('div', 'card');
+      if (!list.length) card.appendChild(el('div', 'empty', 'אין אירועים ביום זה'));
+      list.forEach(function (e) {
+        var row = el('div', 'item' + (may ? '' : ' plain'));
+        row.innerHTML = '<div class="txt"><div class="t">' + esc(e.text) + '</div>' +
+          (e.time ? '<div class="s">' + esc(e.time) + '</div>' : '') + '</div>';
+        if (may) {
+          var del = el('button', 'row-del', 'מחיקה');
+          del.addEventListener('click', function (evt) {
+            evt.stopPropagation();
+            if (!confirm('למחוק את האירוע «' + e.text + '»?')) return;
+            evDel(abs, e.id);
+            renderCal();
+            openDayEvents(abs);
+          });
+          row.appendChild(del);
+          row.addEventListener('click', function () { openEventEditor(abs, e); });
+        }
+        card.appendChild(row);
+      });
+      body.appendChild(card);
+      if (!may) {
+        body.appendChild(el('div', 'foot',
+          'הוספה ועריכה כבויות בהגדרות. האירועים השמורים אינם מושפעים.'));
+        return;
+      }
+      var btns = el('div', 'btn-row');
+      var add = el('button', 'btn-main', 'הוספת אירוע');
+      add.addEventListener('click', function () { openEventEditor(abs, null); });
+      btns.appendChild(add);
+      body.appendChild(btns);
+    });
+  }
+
   function setCity(city) {
     S.locName = city.name; S.lat = city.lat; S.lng = city.lng;
     S.elevation = city.elevation; S.tz = city.tz;
@@ -936,14 +1214,21 @@
         html += '<td class="' + (h.dow === 6 ? 'sh ' : '') + (c.out ? 'out' : '') + '">' +
           '<div class="pr-top"><span class="pr-h">' + esc(h.dayHeb) + '</span>' +
           '<span class="pr-g">' + h.gd + '</span></div>';
+        // ההדפסה נגזרת מאותן הגדרות תצוגה של המסך: מה שמוסתר בלוח אינו מודפס
         var lines = [];
         info.items.slice().sort(function (a, b) {
           return (KIND_RANK[a.kind] || 9) - (KIND_RANK[b.kind] || 9);
-        }).forEach(function (it) { lines.push({ text: it.name, par: false }); });
-        if (info.parasha) lines.push({ text: info.parasha.name, par: true });
+        }).forEach(function (it) { lines.push({ text: it.name }); });
+        if (evVisible()) {
+          evList(c.abs).forEach(function (e) {
+            lines.push({ text: (e.time ? e.time + ' ' : '') + e.text, ev: true });
+          });
+        }
+        if (S.showParasha && info.parasha) lines.push({ text: info.parasha.name, par: true });
         if (info.special) lines.push({ text: info.special, par: true });
-        lines.slice(0, 3).forEach(function (l) {
-          html += '<div class="pr-l' + (l.par ? ' par' : '') + '">' + esc(l.text) + '</div>';
+        lines.slice(0, evVisible() ? 4 : 3).forEach(function (l) {
+          html += '<div class="pr-l' + (l.par ? ' par' : l.ev ? ' ev' : '') + '">' +
+            esc(l.text) + '</div>';
         });
         html += '</td>';
       }
