@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.9.1';
+  var APP_VERSION = '1.9.2';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -70,7 +70,7 @@
         cls: it.kind === 'fast' ? 'fast' : it.kind === 'modern' ? 'modern' : ''
       });
     });
-    if (S.showParasha && info.parasha) out.push({ text: info.parasha.name, cls: 'par' });
+    if (S.showParasha && info.parasha) out.push({ text: shortName(info.parasha.name), cls: 'par' });
     if (info.special) out.push({ text: info.special, cls: 'par' });
     return out.slice(0, 2);
   }
@@ -87,10 +87,15 @@
   function candleText(n) {
     return 'בערב מדליקים ' + (n === 1 ? 'נר אחד' : n === 2 ? 'שני נרות' : n + ' נרות');
   }
+  /** קיצורים לתצוגה בתאי הלוח בלבד; בכרטיס היום מוצג השם המלא */
   function shortName(name) {
     return name
-      .replace('חול המועד', 'חוה״מ')
+      .replace('חול המועד סוכות', 'חוה״מ')
+      .replace('חול המועד פסח', 'חוה״מ')
+      .replace('ערב ראש השנה', 'ערב ר״ה')
+      .replace('ערב יום כיפור', 'ערב יו״כ')
       .replace('יום הזיכרון לחללי מערכות ישראל', 'יום הזיכרון')
+      .replace('יום העצמאות', 'העצמאות')
       .replace('יום הזיכרון לשואה ולגבורה', 'יום השואה')
       .replace('ראש חודש ', 'ר״ח ')
       .replace('שמיני עצרת · שמחת תורה', 'שמח״ת')
@@ -98,7 +103,12 @@
       .replace('חנוכה — יום ', 'חנוכה ')
       .replace('צום י״ז בתמוז', 'י״ז בתמוז')
       .replace('צום עשרה בטבת', 'י׳ בטבת')
-      .replace('שביעי של פסח', 'שביעי ש״פ');
+      .replace('תשעה באב', 'ט׳ באב')
+      .replace('שביעי של פסח', 'שביעי ש״פ')
+      .replace('שושן פורים קטן', 'שו״פ קטן')
+      .replace(' (מוקדם)', '')
+      .replace(' (נדחה)', '')
+      .replace('אחרי מות־קדושים', 'אחרי־קדושים');
   }
 
   /* ================= מצב ================= */
