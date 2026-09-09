@@ -49,7 +49,8 @@ var MONTHS = 13;
 function setup(cfg) {
   var s = JSON.parse(localStorage.getItem('luach.settings') || '{}');
   s.calMode = cfg.mode;
-  s.events = cfg.events;
+  s.evShow = cfg.events;
+  s.evEdit = cfg.events;
   localStorage.setItem('luach.settings', JSON.stringify(s));
   localStorage.removeItem('luach.events');
   if (!cfg.events) return;
