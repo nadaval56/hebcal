@@ -911,30 +911,20 @@
     return best;
   }
 
-  function saveFile(name, text, mime) {
-    var blob = new Blob([text], { type: mime });
-    var file = null;
-    try { file = new File([blob], name, { type: mime }); } catch (e) { }
-    // באייפון הורדה רגילה מתוך יישום מותקן אינה אמינה; שיתוף המערכת
-    // מציע «הוספה ליומן» או «שמירה בקבצים» ישירות.
-    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: name }).catch(function (err) {
-        if (err && err.name === 'AbortError') return;   // המשתמש ביטל
-        anchorSave(blob, name);
-      });
-      return;
-    }
-    anchorSave(blob, name);
-  }
+  var ICS_NAME = 'omer.ics';
+  var ICS_MIME = 'text/calendar;charset=utf-8';
+  var icsUrl = null;   // כתובת ה־blob הפעילה; קודמתה משוחררת בכל בנייה
 
-  function anchorSave(blob, name) {
-    var url = URL.createObjectURL(blob);
-    var a = el('a');
-    a.href = url; a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  function icsPayload(text) {
+    var blob = new Blob([text], { type: ICS_MIME });
+    var file = null;
+    try { file = new File([blob], ICS_NAME, { type: ICS_MIME }); } catch (e) { }
+    if (icsUrl) URL.revokeObjectURL(icsUrl);
+    icsUrl = URL.createObjectURL(blob);
+    return {
+      url: icsUrl, file: file,
+      canShare: !!(file && navigator.canShare && navigator.canShare({ files: [file] }))
+    };
   }
 
   function openOmerExport() {
@@ -942,6 +932,14 @@
     openSheet('הוספה ליומן', function (body) {
       body.appendChild(el('div', 'group-head',
         rem.length + ' תזכורות · ' + Remind.seasonsLabel(rem)));
+
+      /* שתי הדרכים מוצגות יחד, ואין נפילה שקטה מאחת לשנייה: אם אחת אינה
+         מגיבה — וביישום מותקן באייפון זה תרחיש אמיתי — השנייה כבר על המסך.
+         ההורדה היא קישור אמיתי ולא a.click() מתוכנת, שכן לחיצה של המשתמש
+         עצמו היא הדרך האמינה, ולחיצה סינתטית עלולה להיחסם בלי כל סימן. */
+      var p = icsPayload(Remind.buildIcs(rem, {
+        time: S.remOmerTime, version: APP_VERSION
+      }));
 
       var card = el('div', 'card');
       card.appendChild(el('div', 'field',
@@ -953,8 +951,11 @@
         'וגם בלי חיבור לאינטרנט. בשנה הבאה יש לייצא שוב.'));
       card.appendChild(el('div', 'field',
         '<label>איך מייבאים</label>' +
-        '<b>אייפון:</b> לבחור «יומן» בחלון השיתוף, ולאשר «הוספת הכול».<br>' +
-        '<b>אנדרואיד:</b> לפתוח את הקובץ שירד — יומן Google יציע לייבא אותו.'));
+        (p.canShare
+          ? '«פתיחה ביומן» פותחת את חלון השיתוף של המכשיר — שם בוחרים ' +
+            '«יומן» ומאשרים «הוספת הכול».<br>' +
+            'אפשר גם «הורדת הקובץ», ואז לפתוח אותו מתיקיית ההורדות.'
+          : 'לפתוח את הקובץ שירד; יישום היומן יציע לייבא אותו.')));
       card.appendChild(el('div', 'field',
         '<label>לביטול</label>' +
         'התזכורות שייכות ליומן שלך, והאפליקציה אינה יכולה למחוק אותן. ' +
@@ -962,14 +963,25 @@
       body.appendChild(card);
 
       var btns = el('div', 'btn-row');
-      var ok = el('button', 'btn-main', 'הורדת הקובץ');
-      ok.addEventListener('click', function () {
-        saveFile('omer.ics', Remind.buildIcs(rem, {
-          time: S.remOmerTime, version: APP_VERSION
-        }), 'text/calendar;charset=utf-8');
-        closeSheet();
-      });
-      btns.appendChild(ok);
+      var dl = el('a', p.canShare ? 'btn-alt' : 'btn-main', 'הורדת הקובץ');
+      dl.href = p.url;
+      dl.download = ICS_NAME;
+      dl.addEventListener('click', function () { closeSheet(); });
+
+      if (p.canShare) {
+        var sh = el('button', 'btn-main', 'פתיחה ביומן…');
+        sh.addEventListener('click', function () {
+          navigator.share({ files: [p.file], title: ICS_NAME }).then(closeSheet, function (err) {
+            if (err && err.name === 'AbortError') return;   // המשתמש ביטל
+            // לא נופלים להורדה מאחורי גבו: אומרים מה קרה, והחלון נשאר פתוח
+            // עם כפתור ההורדה.
+            alert('לא ניתן היה לפתוח את חלון השיתוף. אפשר להוריד את הקובץ ' +
+              'ולפתוח אותו מתיקיית ההורדות.');
+          });
+        });
+        btns.appendChild(sh);
+      }
+      btns.appendChild(dl);
       body.appendChild(btns);
     });
   }

@@ -296,7 +296,14 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .btn-main {
   flex: 1; padding: 12px; border-radius: var(--radius-sm);
   background: var(--accent); color: var(--on-accent); font-size: 15px; font-weight: 600;
+  text-align: center; text-decoration: none;   /* גם כאשר זהו <a> ולא <button> */
 }
+.btn-alt {
+  flex: 1; padding: 12px; border-radius: var(--radius-sm); background: var(--surface);
+  border: 1px solid var(--line); color: var(--accent); font-size: 15px; font-weight: 600;
+  text-align: center; text-decoration: none;
+}
+.btn-alt:active { opacity: .6; }
 .btn-danger {
   flex: none; padding: 12px 18px; border-radius: var(--radius-sm); background: var(--surface);
   border: 1px solid var(--line); color: var(--fast); font-size: 15px; font-weight: 600;
