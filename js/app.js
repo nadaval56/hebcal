@@ -860,19 +860,24 @@
     return arr.map(function (o) { return { label: o.label, value: o.id, hint: o.hint }; });
   }
 
-  function timeRow(title, sub, warn, value, onChange) {
-    var row = el('div', 'setting');
-    row.innerHTML = '<div class="txt"><div class="t">' + esc(title) + '</div>' +
-      '<div class="s' + (warn ? ' warn' : '') + '">' + esc(sub) + '</div></div>';
-    var input = el('input');
-    input.type = 'time';
-    input.step = 300;
-    input.value = value;
-    row.appendChild(input);
-    input.addEventListener('change', function () {
-      if (/^\d{2}:\d{2}$/.test(input.value)) onChange(input.value);
-    });
-    return row;
+  /* שעות לבחירה, בקפיצות של עשר דקות. במכוון אין כאן <input type="time">:
+     הדפדפן מציג אותו לפי אזור הלוקאל של המערכת, ובמכשיר שאינו מוגדר עברית
+     הוא מציג «08:30 PM» — בעוד שכל שאר הזמנים באפליקציה בני 24 שעות. */
+  var REM_FROM = 17, REM_TO = 24, REM_STEP = 10;
+  function timeOptions(current) {
+    var out = [], seen = {};
+    for (var h = REM_FROM; h < REM_TO; h++) {
+      for (var m = 0; m < 60; m += REM_STEP) {
+        var v = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+        out.push({ label: v, value: v }); seen[v] = true;
+      }
+    }
+    // שעה שמורה שאינה על הרשת לא תיעלם ולא תתחלף בשקט
+    if (current && !seen[current]) {
+      out.push({ label: current, value: current });
+      out.sort(function (a, b) { return a.value < b.value ? -1 : 1; });
+    }
+    return out;
   }
 
   /* ================= תזכורות ================= */
@@ -942,10 +947,10 @@
       card.appendChild(el('div', 'field',
         '<label>מה יקרה</label>' +
         'הקובץ מוסיף ליומן שבטלפון תזכורת יומית בשעה ' + esc(S.remOmerTime) +
-        ', לכל לילות הספירה' +
+        ', לכל לילות הספירה של ' + esc(Remind.seasonsLabel(rem)) +
         (S.remOmerSkipShabbat ? ' מלבד לילות שבת ויום טוב' : '') + '. ' +
         'מרגע הייבוא התזכורות עובדות מן היומן עצמו — גם כשהאפליקציה סגורה ' +
-        'וגם בלי חיבור לאינטרנט.'));
+        'וגם בלי חיבור לאינטרנט. בשנה הבאה יש לייצא שוב.'));
       card.appendChild(el('div', 'field',
         '<label>איך מייבאים</label>' +
         '<b>אייפון:</b> לבחור «יומן» בחלון השיתוף, ולאשר «הוספת הכול».<br>' +
@@ -980,13 +985,14 @@
       var rem = omerReminders();
       var latest = omerLatestTzeit(rem);
       var early = !!latest && S.remOmerTime < latest;
-      r.appendChild(timeRow('שעת התזכורת',
-        latest ? (early
-          ? 'מוקדם מצאת הכוכבים, שבתקופה זו ב' + S.locName + ' עד ' + latest
-          : 'צאת הכוכבים בתקופה זו ב' + S.locName + ' עד ' + latest)
-          : 'הספירה נאמרת אחרי צאת הכוכבים',
-        early, S.remOmerTime,
-        function (v) { S.remOmerTime = v; save(); renderSettings(); }));
+      var timeSub = latest ? (early
+        ? 'מוקדם מצאת הכוכבים, שבתקופה זו ב' + S.locName + ' עד ' + latest
+        : 'צאת הכוכבים בתקופה זו ב' + S.locName + ' עד ' + latest)
+        : 'הספירה נאמרת אחרי צאת הכוכבים';
+      var timeR = selectRow('שעת התזכורת', timeSub, timeOptions(S.remOmerTime),
+        S.remOmerTime, function (v) { S.remOmerTime = v; save(); renderSettings(); });
+      if (early) timeR.querySelector('.s').classList.add('warn');
+      r.appendChild(timeR);
 
       r.appendChild(switchRow('לא בשבת וביום טוב',
         'דילוג על לילות שבת ועל ליל שביעי של פסח',

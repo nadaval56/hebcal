@@ -385,7 +385,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .setting .info:active { background: var(--accent); color: var(--on-accent); }
 .setting .s { max-width: 100%; }
 .setting .s { font-size: 12px; color: var(--muted); }
-.setting select, .setting input[type="time"] { width: auto; min-width: 145px; max-width: 58%; }
+.setting select { width: auto; min-width: 145px; max-width: 58%; }
 .setting .s.warn { color: var(--fast); }
 .switch { width: 44px; height: 26px; border-radius: 999px; background: var(--line); position: relative; transition: background .2s; flex: none; }
 .switch.on { background: var(--accent); }

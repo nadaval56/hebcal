@@ -13,7 +13,7 @@ var Remind = (function (H, Hol) {
   'use strict';
 
   var DOMAIN = 'heb-cal.co.il';
-  var SEASONS = 3;          // כמה תקופות ספירה נכנסות לקובץ אחד
+  var SEASONS = 1;          // תקופת ספירה אחת בכל קובץ — כל שנה והתזכורות שלה
   var EVENT_MINUTES = 15;   // אורך האירוע ביומן; התזכורת עצמה בתחילתו
 
   function dow(abs) { return ((abs % 7) + 7) % 7; }
