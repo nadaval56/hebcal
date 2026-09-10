@@ -175,7 +175,7 @@ var Remind = (function (H, Hol) {
       'PRODID:-//' + DOMAIN + '//Luach' + version + '//HE',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      'X-WR-CALNAME:' + escText('לוח — ספירת העומר'),
+      'X-WR-CALNAME:' + escText('ספירת העומר'),
       'X-WR-CALDESC:' + escText('תזכורת יומית לספירת העומר, מתוך היישום «לוח» — ' + DOMAIN)
     ];
 

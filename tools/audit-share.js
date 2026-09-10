@@ -1,4 +1,4 @@
-/* בדיקת מסירת קובץ היומן — שני מסלולי «הוספה ליומן».
+/* בדיקת מסירת קובץ היומן — «הוספה ליומן».
  *
  *   python3 -m http.server 8000 &
  *   node tools/audit-share.js
@@ -6,17 +6,16 @@
  *
  * דורש playwright-core ודפדפן Chromium מקומי (ראו PW_CHROME).
  *
- * למה הבדיקה הזאת קיימת: מסירת הקובץ היא הנקודה היחידה בתכונה שאי אפשר
- * לאמת כאן מקצה לקצה, שכן ההתנהגות הסופית היא של מערכת ההפעלה — ובאייפון,
- * ביישום המותקן על מסך הבית, ידוע שהורדה רגילה אינה אמינה. הגרסה הראשונה
- * הייתה שרשרת נפילה: מנסים navigator.share, ואם אין — מורידים. תרחיש הכשל
- * שלה היה שקט לחלוטין: לוחצים, ולא קורה דבר.
+ * למה הבדיקה הזאת קיימת: מסירת הקובץ היא הנקודה שאי אפשר לאמת כאן מקצה
+ * לקצה, שכן ההתנהגות הסופית היא של מערכת ההפעלה. הגרסה הראשונה ניסתה
+ * navigator.share ונפלה להורדה — ותרחיש הכשל היה שקט לחלוטין. אחר כך הוצגו
+ * שתי הדרכים יחד, וכך התברר במכשיר אמיתי שהשיתוף פשוט נכשל (אנדרואיד:
+ * הקריאה נדחתה, וההודעה הפנתה להורדה). לכן נשארה ההורדה בלבד.
  *
- * לכן שתי הדרכים מוצגות יחד ואין נפילה שקטה ביניהן, וההורדה היא קישור
- * אמיתי שהמשתמש לוחץ עליו בעצמו — ולא a.click() מתוכנת, שעלול להיחסם
- * בלי כל סימן. את חלון השיתוף של מערכת ההפעלה אי אפשר לבדוק כאן, אבל
- * אפשר לבדוק את הצד שלנו בחוזה: שהקריאה יוצאת עם קובץ אחד, בשם ובסוג
- * הנכונים, ושכל אחת מארבע התוצאות האפשריות מטופלת.
+ * מה שנבדק כאן: שההורדה היא הפעולה היחידה, שהיא קישור אמיתי שהמשתמש לוחץ
+ * עליו — ולא a.click() מתוכנת, שעלול להיחסם בלי כל סימן — ושהקובץ שיורד
+ * הוא ICS תקין. כן נבדק שאין יותר קריאה ל-navigator.share גם כשהדפדפן
+ * מציע אותה, כדי שהמסלול שנכשל לא יחזור בהיסח הדעת.
  */
 'use strict';
 
@@ -38,36 +37,28 @@ function ok(cond, msg) {
   if (!cond) { fails++; console.log('  ✗ ' + msg); }
 }
 
-/** mode: 'none' (אין Web Share), 'ok', 'abort', 'error' */
-async function openExport(browser, mode) {
+/** shareable: האם הדפדפן מציע Web Share עם קבצים */
+async function openExport(browser, shareable) {
   var ctx = await browser.newContext({
     viewport: { width: 390, height: 844 }, acceptDownloads: true
   });
   var page = await ctx.newPage();
-  await page.addInitScript(function (m) {
-    window.__shared = [];
-    if (m === 'none') {
+  await page.addInitScript(function (canShare) {
+    window.__shared = 0;
+    if (!canShare) {
       try { delete navigator.canShare; delete navigator.share; } catch (e) { }
       return;
     }
     Object.defineProperty(navigator, 'canShare', {
-      value: function (d) { return !!(d && d.files && d.files.length); }, configurable: true
+      value: function () { return true; }, configurable: true
     });
     Object.defineProperty(navigator, 'share', {
-      value: function (d) {
-        window.__shared.push({
-          n: d.files.length, name: d.files[0].name,
-          type: d.files[0].type, size: d.files[0].size
-        });
-        if (m === 'ok') return Promise.resolve();
-        var e = new Error('share'); e.name = (m === 'abort') ? 'AbortError' : 'NotAllowedError';
-        return Promise.reject(e);
-      }, configurable: true
+      value: function () { window.__shared++; return Promise.resolve(); }, configurable: true
     });
-  }, mode);
+  }, shareable);
 
-  /* ההודעות נאספות בצד Node ולא בתוך הדף: קריאה אל תוך הדף בזמן שדיאלוג
-     מודאלי פתוח תוקעת את שניהם. */
+  /* הודעות נאספות בצד Node: קריאה אל תוך הדף בזמן שדיאלוג מודאלי פתוח
+     תוקעת את שניהם. */
   page.alerts = [];
   page.on('dialog', function (d) { page.alerts.push(d.message()); d.dismiss(); });
 
@@ -99,51 +90,41 @@ function actions(page) {
     process.exit(2);
   }
 
-  // ללא Web Share (שולחן עבודה): הורדה בלבד, והיא הפעולה הראשית
-  var page = await openExport(browser, 'none');
-  var a = await actions(page);
-  ok(a.length === 1, 'ללא שיתוף: ' + a.length + ' פעולות במקום אחת');
-  ok(/^a\.btn-main:/.test(a[0] || ''), 'ההורדה אינה קישור ראשי: ' + a[0]);
-  ok(await page.getAttribute('#sheet-body .btn-row a', 'download') === 'omer.ics',
-    'חסר download="omer.ics"');
-  var pair = await Promise.all([
-    page.waitForEvent('download'), page.click('#sheet-body .btn-row a')
-  ]);
-  ok(pair[0].suggestedFilename() === 'omer.ics', 'שם הקובץ שירד: ' + pair[0].suggestedFilename());
-  await page.context().close();
+  for (var i = 0; i < 2; i++) {
+    var shareable = (i === 1);
+    var where = shareable ? 'עם Web Share' : 'בלי Web Share';
 
-  // עם Web Share: שתי הפעולות יחד, והשיתוף ראשי
-  page = await openExport(browser, 'ok');
-  a = await actions(page);
-  ok(a.length === 2, 'עם שיתוף: ' + a.length + ' פעולות במקום שתיים');
-  ok(/^button\.btn-main:/.test(a[0] || ''), 'השיתוף אינו הפעולה הראשית: ' + a[0]);
-  ok(/^a\.btn-alt:/.test(a[1] || ''), 'ההורדה אינה מוצגת לצדו: ' + a[1]);
-  await page.click('#sheet-body .btn-row button');
-  await page.waitForTimeout(400);
-  var sent = await page.evaluate(function () { return window.__shared; });
-  ok(sent.length === 1, 'נשלחו ' + sent.length + ' קריאות שיתוף במקום אחת');
-  ok(sent[0] && sent[0].n === 1, 'נשלח יותר מקובץ אחד');
-  ok(sent[0] && sent[0].name === 'omer.ics', 'שם הקובץ בשיתוף: ' + (sent[0] || {}).name);
-  ok(sent[0] && /^text\/calendar/.test(sent[0].type), 'סוג הקובץ: ' + (sent[0] || {}).type);
-  ok(sent[0] && sent[0].size > 5000, 'הקובץ ריק או קצר: ' + (sent[0] || {}).size);
-  await page.context().close();
+    var page = await openExport(browser, shareable);
+    var a = await actions(page);
 
-  // ביטול המשתמש: בשקט — בלי הודעה, ובלי הורדה מאחורי גבו
-  page = await openExport(browser, 'abort');
-  await page.click('#sheet-body .btn-row button');
-  await page.waitForTimeout(400);
-  ok(page.alerts.length === 0, 'ביטול הציג הודעה: ' + JSON.stringify(page.alerts));
-  ok((await actions(page)).length === 2, 'החלון נסגר אחרי ביטול');
-  await page.context().close();
+    // ההורדה היא הפעולה היחידה — גם כשהדפדפן מציע שיתוף
+    ok(a.length === 1, where + ': ' + a.length + ' פעולות במקום אחת — ' + a);
+    ok(/^a\.btn-main:הורדת הקובץ$/.test(a[0] || ''), where + ': הפעולה אינה קישור הורדה ראשי: ' + a[0]);
+    ok(await page.getAttribute('#sheet-body .btn-row a', 'download') === 'omer.ics',
+      where + ': חסר download="omer.ics"');
 
-  // כשל אמיתי: נאמר למשתמש, והחלון נשאר פתוח עם ההורדה
-  page = await openExport(browser, 'error');
-  await page.click('#sheet-body .btn-row button');
-  await page.waitForTimeout(400);
-  ok(page.alerts.length === 1, 'כשל בשיתוף לא הוצג למשתמש');
-  ok(/להוריד את הקובץ/.test(page.alerts[0] || ''), 'ההודעה אינה מפנה להורדה');
-  ok((await actions(page)).length === 2, 'ההורדה אינה זמינה אחרי הכשל');
-  await page.context().close();
+    var pair = await Promise.all([
+      page.waitForEvent('download'), page.click('#sheet-body .btn-row a')
+    ]);
+    ok(pair[0].suggestedFilename() === 'omer.ics',
+      where + ': שם הקובץ שירד: ' + pair[0].suggestedFilename());
+
+    var tmp = require('os').tmpdir() + '/audit-share-' + i + '.ics';
+    await pair[0].saveAs(tmp);
+    var text = require('fs').readFileSync(tmp, 'utf8');
+    ok(/^BEGIN:VCALENDAR\r\n/.test(text), where + ': הקובץ אינו נפתח ב־VCALENDAR');
+    ok(/END:VCALENDAR\r\n$/.test(text), where + ': הקובץ אינו נסגר ב־VCALENDAR');
+    ok(/^X-WR-CALNAME:ספירת העומר$/m.test(text), where + ': שם הלוח שבקובץ אינו «ספירת העומר»');
+    ok((text.match(/BEGIN:VEVENT/g) || []).length > 30, where + ': מעט מדי אירועים');
+    require('fs').unlinkSync(tmp);
+
+    // המסלול שנכשל במכשיר אמיתי לא יחזור בהיסח הדעת
+    ok(await page.evaluate(function () { return window.__shared; }) === 0,
+      where + ': נקראה navigator.share');
+    ok(page.alerts.length === 0, where + ': הוצגה הודעה: ' + JSON.stringify(page.alerts));
+
+    await page.context().close();
+  }
 
   await browser.close();
   console.log('מסירת הקובץ: ' + checks + ' בדיקות, ' + fails + ' כשלו');

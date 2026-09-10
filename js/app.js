@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.13.0';
+  var APP_VERSION = '1.13.1';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -917,26 +917,19 @@
 
   function icsPayload(text) {
     var blob = new Blob([text], { type: ICS_MIME });
-    var file = null;
-    try { file = new File([blob], ICS_NAME, { type: ICS_MIME }); } catch (e) { }
     if (icsUrl) URL.revokeObjectURL(icsUrl);
     icsUrl = URL.createObjectURL(blob);
-    return {
-      url: icsUrl, file: file,
-      canShare: !!(file && navigator.canShare && navigator.canShare({ files: [file] }))
-    };
+    return { url: icsUrl };
   }
 
   function openOmerExport() {
     var rem = omerReminders();
+    var label = Remind.seasonsLabel(rem);
     openSheet('הוספה ליומן', function (body) {
-      body.appendChild(el('div', 'group-head',
-        rem.length + ' תזכורות · ' + Remind.seasonsLabel(rem)));
+      body.appendChild(el('div', 'group-head', rem.length + ' תזכורות · ' + label));
 
-      /* שתי הדרכים מוצגות יחד, ואין נפילה שקטה מאחת לשנייה: אם אחת אינה
-         מגיבה — וביישום מותקן באייפון זה תרחיש אמיתי — השנייה כבר על המסך.
-         ההורדה היא קישור אמיתי ולא a.click() מתוכנת, שכן לחיצה של המשתמש
-         עצמו היא הדרך האמינה, ולחיצה סינתטית עלולה להיחסם בלי כל סימן. */
+      /* הורדה בלבד. היה כאן גם מסלול navigator.share, והוא נכשל במכשיר
+         אמיתי (אנדרואיד, קריאה שנדחתה) — ההורדה היא הדרך שעובדת. */
       var p = icsPayload(Remind.buildIcs(rem, {
         time: S.remOmerTime, version: APP_VERSION
       }));
@@ -944,43 +937,41 @@
       var card = el('div', 'card');
       card.appendChild(el('div', 'field',
         '<label>מה יקרה</label>' +
-        'הקובץ מוסיף ליומן שבטלפון תזכורת יומית בשעה ' + esc(S.remOmerTime) +
-        ', לכל לילות הספירה של ' + esc(Remind.seasonsLabel(rem)) +
-        ' מלבד לילות שבת ויום טוב. ' +
+        'הקובץ מוסיף ליומן תזכורת יומית בשעה ' + esc(S.remOmerTime) +
+        ', לכל לילות הספירה של ' + esc(label) + ' מלבד לילות שבת ויום טוב. ' +
         'מרגע הייבוא התזכורות עובדות מן היומן עצמו — גם כשהאפליקציה סגורה ' +
         'וגם בלי חיבור לאינטרנט. בשנה הבאה יש לייצא שוב.'));
+
+      /* מומלץ ללוח נפרד, וזה לא קישוט: יומן Google מתעלם משם הלוח שבקובץ
+         ומייבא ללוח שבוחרים בו, והוא גם דורס את ההתראה שבקובץ ומחיל את
+         ברירות המחדל של אותו לוח — ומשם הגיעה תזכורת המייל. לוח ייעודי
+         הוא המקום היחיד שבו אפשר לכבות מייל ולקבוע «בזמן האירוע». */
       card.appendChild(el('div', 'field',
-        '<label>איך מייבאים</label>' +
-        (p.canShare
-          ? '«פתיחה ביומן» פותחת את חלון השיתוף של המכשיר — שם בוחרים ' +
-            '«יומן» ומאשרים «הוספת הכול».<br>' +
-            'אפשר גם «הורדת הקובץ», ואז לפתוח אותו מתיקיית ההורדות.'
-          : 'לפתוח את הקובץ שירד; יישום היומן יציע לייבא אותו.')));
+        '<label>מומלץ: ללוח נפרד</label>' +
+        'ב־calendar.google.com (במחשב, או «אתר לגרסת מחשב» בדפדפן הטלפון):' +
+        '<br>1. ליצור לוח חדש בשם «ספירת העומר».' +
+        '<br>2. הגדרות ← ייבוא, ולבחור אותו כלוח היעד.' +
+        '<br>3. בהגדרות הלוח לקבוע התראה «בזמן האירוע» ולכבות מייל.' +
+        '<br>כך אפשר להציג, להסתיר או למחוק את כל התזכורות במתג אחד.'));
+
+      card.appendChild(el('div', 'field',
+        '<label>בטלפון בלבד</label>' +
+        'לפתוח את הקובץ שירד ולבחור <b>יומן Google</b> מרשימת האפליקציות. ' +
+        'הכול ייכנס ללוח הראשי, ותזכורות המייל ושעת ההתראה ייקבעו לפי ' +
+        'ברירות המחדל שלו.'));
+
       card.appendChild(el('div', 'field',
         '<label>לביטול</label>' +
         'התזכורות שייכות ליומן שלך, והאפליקציה אינה יכולה למחוק אותן. ' +
-        'מוחקים אותן ביומן עצמו — הן מסומנות «ספירת העומר».'));
+        'בלוח נפרד — מוחקים את הלוח. אחרת — מוחקים את האירועים ביומן; ' +
+        'הם מסומנים «ספירת העומר».'));
       body.appendChild(card);
 
       var btns = el('div', 'btn-row');
-      var dl = el('a', p.canShare ? 'btn-alt' : 'btn-main', 'הורדת הקובץ');
+      var dl = el('a', 'btn-main', 'הורדת הקובץ');
       dl.href = p.url;
       dl.download = ICS_NAME;
       dl.addEventListener('click', function () { closeSheet(); });
-
-      if (p.canShare) {
-        var sh = el('button', 'btn-main', 'פתיחה ביומן…');
-        sh.addEventListener('click', function () {
-          navigator.share({ files: [p.file], title: ICS_NAME }).then(closeSheet, function (err) {
-            if (err && err.name === 'AbortError') return;   // המשתמש ביטל
-            // לא נופלים להורדה מאחורי גבו: אומרים מה קרה, והחלון נשאר פתוח
-            // עם כפתור ההורדה.
-            alert('לא ניתן היה לפתוח את חלון השיתוף. אפשר להוריד את הקובץ ' +
-              'ולפתוח אותו מתיקיית ההורדות.');
-          });
-        });
-        btns.appendChild(sh);
-      }
       btns.appendChild(dl);
       body.appendChild(btns);
     });
