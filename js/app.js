@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.12.1';
+  var APP_VERSION = '1.13.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -12,6 +12,7 @@
     locName: 'ירושלים', lat: 31.7683, lng: 35.2137, elevation: 754, tz: 'Asia/Jerusalem',
     israel: true, theme: 'auto', calMode: 'greg', showParasha: true, isGps: false,
     evShow: true, evEdit: false,
+    remOmer: false, remOmerTime: '20:30', remOmerSkipShabbat: true,
     alot: '72', misheyakir: '45', tzeit: '25', shabbatEnd: '35', candles: 40, useElevation: false
   };
   var S = load();
@@ -859,6 +860,152 @@
     return arr.map(function (o) { return { label: o.label, value: o.id, hint: o.hint }; });
   }
 
+  function timeRow(title, sub, warn, value, onChange) {
+    var row = el('div', 'setting');
+    row.innerHTML = '<div class="txt"><div class="t">' + esc(title) + '</div>' +
+      '<div class="s' + (warn ? ' warn' : '') + '">' + esc(sub) + '</div></div>';
+    var input = el('input');
+    input.type = 'time';
+    input.step = 300;
+    input.value = value;
+    row.appendChild(input);
+    input.addEventListener('change', function () {
+      if (/^\d{2}:\d{2}$/.test(input.value)) onChange(input.value);
+    });
+    return row;
+  }
+
+  /* ================= תזכורות ================= */
+  /* אין בדפדפן דרך לתזמן התראה לעתיד, ולכן האפליקציה אינה מתריעה בעצמה
+     אלא מייצרת קובץ יומן תקני; מערכת ההפעלה היא שמתריעה. ראו js/remind.js. */
+
+  function omerReminders() {
+    return Remind.omerReminders({
+      fromAbs: todayAbs(), israel: S.israel, skipShabbat: S.remOmerSkipShabbat
+    });
+  }
+
+  /**
+   * השעה שאחריה אפשר לספור בכל לילות התקופה הקרובה: המאוחר שבזמני צאת
+   * הכוכבים שלה, ובמוצאי שבת צאת השבת — שהוא מאוחר יותר. תזכורת מוקדמת
+   * מזה תגיע בחלק מן הלילות לפני שהגיע זמן הספירה.
+   */
+  function omerLatestTzeit(reminders) {
+    var best = '';
+    if (!reminders.length) return best;
+    var hy = reminders[0].hy;
+    for (var i = 0; i < reminders.length; i++) {
+      if (reminders[i].hy !== hy) break;
+      var abs = reminders[i].abs;
+      var z = Zmanim.compute(HDate.absToDate(abs), loc(), zopts());
+      var t = Remind.dow(abs) === 6 ? z.tzeitShabbat : z.tzeit;   // מוצאי שבת
+      if (!t) continue;
+      var s = fmtTime(t);
+      if (s > best) best = s;   // HH:MM מרופד באפסים — השוואת מחרוזות תקפה
+    }
+    return best;
+  }
+
+  function saveFile(name, text, mime) {
+    var blob = new Blob([text], { type: mime });
+    var file = null;
+    try { file = new File([blob], name, { type: mime }); } catch (e) { }
+    // באייפון הורדה רגילה מתוך יישום מותקן אינה אמינה; שיתוף המערכת
+    // מציע «הוספה ליומן» או «שמירה בקבצים» ישירות.
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: name }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;   // המשתמש ביטל
+        anchorSave(blob, name);
+      });
+      return;
+    }
+    anchorSave(blob, name);
+  }
+
+  function anchorSave(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  }
+
+  function openOmerExport() {
+    var rem = omerReminders();
+    openSheet('הוספה ליומן', function (body) {
+      body.appendChild(el('div', 'group-head',
+        rem.length + ' תזכורות · ' + Remind.seasonsLabel(rem)));
+
+      var card = el('div', 'card');
+      card.appendChild(el('div', 'field',
+        '<label>מה יקרה</label>' +
+        'הקובץ מוסיף ליומן שבטלפון תזכורת יומית בשעה ' + esc(S.remOmerTime) +
+        ', לכל לילות הספירה' +
+        (S.remOmerSkipShabbat ? ' מלבד לילות שבת ויום טוב' : '') + '. ' +
+        'מרגע הייבוא התזכורות עובדות מן היומן עצמו — גם כשהאפליקציה סגורה ' +
+        'וגם בלי חיבור לאינטרנט.'));
+      card.appendChild(el('div', 'field',
+        '<label>איך מייבאים</label>' +
+        '<b>אייפון:</b> לבחור «יומן» בחלון השיתוף, ולאשר «הוספת הכול».<br>' +
+        '<b>אנדרואיד:</b> לפתוח את הקובץ שירד — יומן Google יציע לייבא אותו.'));
+      card.appendChild(el('div', 'field',
+        '<label>לביטול</label>' +
+        'התזכורות שייכות ליומן שלך, והאפליקציה אינה יכולה למחוק אותן. ' +
+        'מוחקים אותן ביומן עצמו — הן מסומנות «ספירת העומר».'));
+      body.appendChild(card);
+
+      var btns = el('div', 'btn-row');
+      var ok = el('button', 'btn-main', 'הורדת הקובץ');
+      ok.addEventListener('click', function () {
+        saveFile('omer.ics', Remind.buildIcs(rem, {
+          time: S.remOmerTime, version: APP_VERSION
+        }), 'text/calendar;charset=utf-8');
+        closeSheet();
+      });
+      btns.appendChild(ok);
+      body.appendChild(btns);
+    });
+  }
+
+  function renderReminders() {
+    var r = $('#set-reminders');
+    r.innerHTML = '';
+    r.appendChild(switchRow('תזכורת לספירת העומר',
+      'תזכורת יומית בכל לילות הספירה',
+      S.remOmer, function (v) { S.remOmer = v; save(); renderSettings(); }));
+
+    if (S.remOmer) {
+      var rem = omerReminders();
+      var latest = omerLatestTzeit(rem);
+      var early = !!latest && S.remOmerTime < latest;
+      r.appendChild(timeRow('שעת התזכורת',
+        latest ? (early
+          ? 'מוקדם מצאת הכוכבים, שבתקופה זו ב' + S.locName + ' עד ' + latest
+          : 'צאת הכוכבים בתקופה זו ב' + S.locName + ' עד ' + latest)
+          : 'הספירה נאמרת אחרי צאת הכוכבים',
+        early, S.remOmerTime,
+        function (v) { S.remOmerTime = v; save(); renderSettings(); }));
+
+      r.appendChild(switchRow('לא בשבת וביום טוב',
+        'דילוג על לילות שבת ועל ליל שביעי של פסח',
+        S.remOmerSkipShabbat,
+        function (v) { S.remOmerSkipShabbat = v; save(); renderSettings(); }));
+
+      var dl = el('button', 'setting');
+      dl.innerHTML = '<div class="txt"><div class="t" style="color:var(--accent)">הוספה ליומן</div>' +
+        '<div class="s">' + rem.length + ' תזכורות · ' + esc(Remind.seasonsLabel(rem)) + '</div></div>';
+      dl.addEventListener('click', openOmerExport);
+      r.appendChild(dl);
+    }
+
+    $('#reminders-note').textContent = S.remOmer
+      ? 'הדפדפן אינו יכול להתריע בשעה קבועה כשהוא סגור, ולכן התזכורות ' +
+        'נוספות ליומן של הטלפון — והוא שמתריע, גם ללא רשת.'
+      : 'תזכורת יומית לספירת העומר, דרך היומן של הטלפון.';
+  }
+
   function renderSettings() {
     $('#set-loc-name').textContent = S.locName + (S.isGps ? ' · GPS' : '');
     $('#set-loc-sub').textContent = S.lat.toFixed(4) + '°, ' + S.lng.toFixed(4) + '°' +
@@ -934,6 +1081,8 @@
     }
     $('#events-note').textContent = 'האירועים נשמרים במכשיר בלבד, ואינם נמחקים ' +
       'בעדכון גרסה של האפליקציה. ניקוי נתוני הדפדפן מוחק אותם.';
+
+    renderReminders();
 
     $('#about').innerHTML =
       'לוח · לוח שנה עברי וזמני היום<br>' +
