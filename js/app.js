@@ -12,7 +12,7 @@
     locName: 'ירושלים', lat: 31.7683, lng: 35.2137, elevation: 754, tz: 'Asia/Jerusalem',
     israel: true, theme: 'auto', calMode: 'greg', showParasha: true, isGps: false,
     evShow: true, evEdit: false,
-    remOmer: false, remOmerTime: '20:30', remOmerSkipShabbat: true,
+    remOmer: false, remOmerTime: '20:30',
     alot: '72', misheyakir: '45', tzeit: '25', shabbatEnd: '35', candles: 40, useElevation: false
   };
   var S = load();
@@ -886,7 +886,7 @@
 
   function omerReminders() {
     return Remind.omerReminders({
-      fromAbs: todayAbs(), israel: S.israel, skipShabbat: S.remOmerSkipShabbat
+      fromAbs: todayAbs(), israel: S.israel, skipShabbat: true
     });
   }
 
@@ -948,7 +948,7 @@
         '<label>מה יקרה</label>' +
         'הקובץ מוסיף ליומן שבטלפון תזכורת יומית בשעה ' + esc(S.remOmerTime) +
         ', לכל לילות הספירה של ' + esc(Remind.seasonsLabel(rem)) +
-        (S.remOmerSkipShabbat ? ' מלבד לילות שבת ויום טוב' : '') + '. ' +
+        ' מלבד לילות שבת ויום טוב. ' +
         'מרגע הייבוא התזכורות עובדות מן היומן עצמו — גם כשהאפליקציה סגורה ' +
         'וגם בלי חיבור לאינטרנט. בשנה הבאה יש לייצא שוב.'));
       card.appendChild(el('div', 'field',
@@ -978,7 +978,7 @@
     var r = $('#set-reminders');
     r.innerHTML = '';
     r.appendChild(switchRow('תזכורת לספירת העומר',
-      'תזכורת יומית בכל לילות הספירה',
+      'תזכורת יומית בלילות הספירה',
       S.remOmer, function (v) { S.remOmer = v; save(); renderSettings(); }));
 
     if (S.remOmer) {
@@ -994,11 +994,6 @@
       if (early) timeR.querySelector('.s').classList.add('warn');
       r.appendChild(timeR);
 
-      r.appendChild(switchRow('לא בשבת וביום טוב',
-        'דילוג על לילות שבת ועל ליל שביעי של פסח',
-        S.remOmerSkipShabbat,
-        function (v) { S.remOmerSkipShabbat = v; save(); renderSettings(); }));
-
       var dl = el('button', 'setting');
       dl.innerHTML = '<div class="txt"><div class="t" style="color:var(--accent)">הוספה ליומן</div>' +
         '<div class="s">' + rem.length + ' תזכורות · ' + esc(Remind.seasonsLabel(rem)) + '</div></div>';
@@ -1006,9 +1001,14 @@
       r.appendChild(dl);
     }
 
+    /* הדילוג על לילות שבת ויום טוב אינו העדפה אלא התנהגות קבועה — קהל
+       היעד אינו בוחר בתזכורת בשבת, ומתג שאיש אינו מכבה הוא רעש בלבד.
+       במקומו הערה, כדי שהחסר יהיה מוסבר ולא ייראה כתקלה. */
     $('#reminders-note').textContent = S.remOmer
-      ? 'הדפדפן אינו יכול להתריע בשעה קבועה כשהוא סגור, ולכן התזכורות ' +
-        'נוספות ליומן של הטלפון — והוא שמתריע, גם ללא רשת.'
+      ? 'התזכורות נוספות ליומן של הטלפון, והוא שמתריע — גם כשהאפליקציה ' +
+        'סגורה וגם ללא רשת. אין תזכורת בלילות שבת ויום טוב: שבעת לילות ' +
+        'השבת שבתקופה, ו' +
+        (S.israel ? 'ליל שביעי של פסח.' : 'לילות יום טוב של פסח.')
       : 'תזכורת יומית לספירת העומר, דרך היומן של הטלפון.';
   }
 
