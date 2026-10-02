@@ -478,3 +478,33 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   .dc-date { font-size: 17.5px; }
   .dc-times { margin-top: 8px; padding-top: 8px; }
 }
+
+/* ===== עוד אתרים שלי — בתחתית מסך ההגדרות =====
+   הפס מאתר מזג האוויר (ומשם מאתר הגניזה), בצבעי הלוח.
+   אזור גלילה רגיל שזז לאט כשלא נוגעים בו (js/sister.js); ברשימה שני
+   עותקים כדי שהתנועה תהיה רציפה. במצב "בלי תנועה" ההעתק מוסתר. */
+.sister {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  line-height: 1.6; margin: 0 12px; padding: 0 0 calc(18px + env(safe-area-inset-bottom));
+}
+.sister-lbl { flex: none; font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.sister-view {
+  flex: 1; min-width: 0;
+  overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 1.25rem, #000 calc(100% - 1.25rem), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 1.25rem, #000 calc(100% - 1.25rem), transparent 100%);
+}
+.sister-view::-webkit-scrollbar { display: none; }
+.sister-track { display: flex; width: max-content; }
+.sister-set { display: flex; gap: 8px; padding-inline-end: 8px; }
+.sister a {
+  flex: none; white-space: nowrap;
+  font-size: 12.5px; color: var(--ink-2); text-decoration: none;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 12px;
+  transition: color .2s, border-color .2s;
+}
+.sister a:hover, .sister a:focus-visible { color: var(--accent); border-color: var(--accent); }
+.sister a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .sister-clone { display: none; } }
