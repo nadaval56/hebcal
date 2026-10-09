@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.14.0';
+  var APP_VERSION = '1.14.1';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -598,7 +598,7 @@
         hm = Holidays.nextMonth(hm, hy);
         if (hm === 7) hy++;
       } else {
-        if (hm === 7) { hy--; hm = HDate.isLeapYear(hy) ? 13 : 12; }
+        if (hm === 7) { hy--; hm = 6; }
         else if (hm === 1) hm = HDate.isLeapYear(hy) ? 13 : 12;
         else hm--;
       }
