@@ -3,9 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<title>לוח עברי — לוח שנה וזמני היום</title>
+<title>לוח עברי — לוח שנה עברי־לועזי, זמני היום וחגים</title>
 <meta name="description" content="לוח שנה עברי ולועזי במקביל, זמני היום המלאים, חגים ופרשת השבוע — לפי המיקום שלך. ללא פרסומות, עובד גם ללא אינטרנט, וניתן להתקנה כאפליקציה על מסך הבית.">
 <meta name="theme-color" content="#f4f2ec">
+<link rel="canonical" href="https://heb-cal.co.il/">
+
+<!-- נתונים מובנים למנועי חיפוש -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "לוח עברי",
+  "alternateName": "לוח שנה עברי וזמני היום",
+  "url": "https://heb-cal.co.il/",
+  "inLanguage": "he",
+  "applicationCategory": "LifestyleApplication",
+  "operatingSystem": "Any",
+  "description": "לוח שנה עברי ולועזי במקביל, זמני היום המלאים, חגים, צומות ופרשת השבוע לפי המיקום שלך, וממיר תאריכים עברי־לועזי. ללא פרסומות ועובד גם ללא אינטרנט.",
+  "image": "https://heb-cal.co.il/assets/og.png",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "ILS" }
+}
+</script>
 
 <!-- תצוגה מקדימה בוואטסאפ וברשתות -->
 <meta property="og:type" content="website">
@@ -50,6 +68,8 @@
   <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 9V4h12v5M6 18H4v-6h16v6h-2M8 14h8v6H8z"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v13M12 3 8 7M12 3l4 4M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></symbol>
 </svg>
+
+<noscript><p style="padding:16px">לוח עברי — לוח שנה עברי ולועזי, זמני היום, חגים ופרשת השבוע. כדי להשתמש בלוח יש להפעיל JavaScript בדפדפן.</p></noscript>
 
 <div id="app">
   <header class="topbar">
@@ -143,6 +163,16 @@
       <div class="section-title">אירועים אישיים</div>
       <div class="foot" id="events-note"></div>
       <div class="card" id="set-events"></div>
+
+      <div class="section-title">אודות</div>
+      <div class="foot" style="text-align:start">
+        <h2 style="font-size:inherit;margin:0 0 4px">לוח עברי — לוח שנה עברי וזמני היום</h2>
+        <p style="margin:0 0 6px">לוח שנה עברי ולועזי במקביל: התאריך העברי היום, חגים ומועדי ישראל, צומות, ראשי חודשים,
+        פרשת השבוע ושבתות מיוחדות. זמני היום המלאים לפי המיקום שלך — עלות השחר, הנץ החמה, סוף זמן קריאת שמע ותפילה
+        (מג״א והגר״א), חצות, מנחה גדולה וקטנה, פלג המנחה, שקיעה וצאת הכוכבים, כולל זמני כניסת השבת וצאתה.</p>
+        <p style="margin:0">ממיר תאריכים עברי־לועזי בשני הכיוונים, עם התאריך העברי בשנים הבאות ליום הולדת או ליארצייט.
+        אפשר להדפיס לוח חודשי, ולהתקין את הלוח כאפליקציה על מסך הבית — הוא עובד גם ללא חיבור לאינטרנט.</p>
+      </div>
 
       <div class="foot" id="about"></div>
 
