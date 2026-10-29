@@ -111,6 +111,9 @@ var Zmanim = (function () {
   function degreesAfter(date, loc, deg) { return sunEvent(date, loc, 90 + deg, false); }
 
   function addMin(dt, minutes) { return dt ? new Date(dt.getTime() + minutes * MIN) : null; }
+  /** עיגול כלפי מעלה לדקה שלמה — לזמני יציאה (צאת הכוכבים, צאת שבת וחג, סיום צום).
+   *  התצוגה חותכת את השניות, ובלי העיגול הזמן המוצג היה מוקדם עד דקה מהזמן האמיתי. */
+  function ceilMinute(dt) { return dt ? new Date(Math.ceil(dt.getTime() / MIN) * MIN) : null; }
 
   /** שעה זמנית (1/12 מהיום) במילישניות */
   function shaahZmanit(start, end) {
@@ -239,8 +242,8 @@ var Zmanim = (function () {
       { key: 'minchaKetana', label: 'מנחה קטנה', note: 'תשע שעות ומחצה', time: gra(9.5), group: 'צהריים' },
       { key: 'plag', label: 'פלג המנחה', note: 'עשר שעות ושלושה רבעים', time: gra(10.75), group: 'צהריים' },
       { key: 'sunset', label: 'שקיעת החמה', note: o.useElevation ? 'לפי גובה המקום' : 'בגובה פני הים', time: ss, group: 'ערב' },
-      { key: 'tzeit', label: 'צאת הכוכבים', note: tzeitOpt.label, time: tzeit, group: 'ערב' },
-      { key: 'tzeitRT', label: 'צאת הכוכבים דרבנו תם', note: '72 דקות אחרי השקיעה', time: tzeit72, group: 'ערב' },
+      { key: 'tzeit', label: 'צאת הכוכבים', note: tzeitOpt.label, time: ceilMinute(tzeit), group: 'ערב' },
+      { key: 'tzeitRT', label: 'צאת הכוכבים דרבנו תם', note: '72 דקות אחרי השקיעה', time: ceilMinute(tzeit72), group: 'ערב' },
       { key: 'chatzotLayla', label: 'חצות הלילה', note: 'אמצע הלילה', time: chatzotLayla, group: 'ערב' }
     ];
 
@@ -248,7 +251,8 @@ var Zmanim = (function () {
       date: date, loc: loc, opts: o,
       sunrise: sr, sunset: ss, chatzot: chatzot,
       alot: alot, alot72: alot72, misheyakir: misheyakir,
-      tzeit: tzeit, tzeit72: tzeit72, tzeitShabbat: tzeitShabbat,
+      // זמני יציאה מעוגלים כלפי מעלה; החישובים (מג״א) נעשים בערכים המדויקים
+      tzeit: ceilMinute(tzeit), tzeit72: ceilMinute(tzeit72), tzeitShabbat: ceilMinute(tzeitShabbat),
       candles: addMin(ss, -o.candles),
       prevSunset: prevSs, nextSunrise: nextSr,
       shaahGra: shaahGra, shaahMga: shaahMga,
@@ -268,7 +272,7 @@ var Zmanim = (function () {
     sunriseSeaLevel: sunriseSeaLevel, sunsetSeaLevel: sunsetSeaLevel,
     degreesBefore: degreesBefore, degreesAfter: degreesAfter,
     elevationAdjustment: elevationAdjustment,
-    addMin: addMin, shaahZmanit: shaahZmanit, proportional: proportional
+    addMin: addMin, ceilMinute: ceilMinute, shaahZmanit: shaahZmanit, proportional: proportional
   };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Zmanim;
