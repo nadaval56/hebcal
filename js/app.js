@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.14.4';
+  var APP_VERSION = '1.15.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -1167,12 +1167,16 @@
   }
 
   function setCity(city) {
+    applyCity(city);
+    renderAll();
+  }
+  function applyCity(city) {
     S.locName = city.name; S.lat = city.lat; S.lng = city.lng;
     S.elevation = city.elevation; S.tz = city.tz;
     // מנהגי הדלקת נרות מקובלים — נקבעים מחדש בכל החלפת יישוב
     S.candles = city.name === 'ירושלים' ? 40 : city.name === 'חיפה' ? 30 : 20;
     S.isGps = false;
-    save(); renderAll();
+    save();
   }
 
   function useGps() {
@@ -1310,8 +1314,31 @@
       .catch(function () { });
   }
 
+  /**
+   * פתיחה מקישור בדפים הסטטיים (zmanim/, chagim/):
+   *   ?city=<שם יישוב כמו ב־cities.js>  ?view=cal|zman|conv  ?date=YYYY-MM-DD
+   * היישוב נשמר כמו בבחירה ידנית. אחר כך הכתובת מתנקה, כדי שרענון או
+   * התקנה למסך הבית לא יחזרו לאותו מצב. מחזיר את המסך לפתיחה.
+   */
+  function applyLinkParams() {
+    var p;
+    try { p = new URLSearchParams(location.search); } catch (e) { return 'cal'; }
+    if (!location.search) return 'cal';
+    var city = p.get('city') && Cities.byName(p.get('city'));
+    if (city) applyCity(city);
+    var d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(p.get('date') || '');
+    if (d) {
+      var abs = HDate.gregToAbs(+d[1], +d[2], +d[3]);
+      state.sel = abs; state.zman = abs; resetAnchor(abs);
+    }
+    try { history.replaceState(null, '', location.pathname); } catch (e) { }
+    var view = p.get('view');
+    return TITLES[view] ? view : 'cal';
+  }
+
   /* ================= אתחול ================= */
   function init() {
+    var startView = applyLinkParams();
     applyTheme();
     if (window.matchMedia) {
       var mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -1366,7 +1393,7 @@
 
     renderLocLabel();
     renderCal();
-    go('cal');
+    go(startView);
 
     // רענון הספירה לאחור וחצות
     setInterval(function () {
