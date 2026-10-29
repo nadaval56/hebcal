@@ -4,7 +4,10 @@
      zmanim/index.html          רשימת היישובים
      zmanim/<slug>/index.html   זמני השבוע וזמני השבתות הקרובות ביישוב
      chagim/index.html          רשימת החגים והמועד הקרוב של כל אחד
-     chagim/<slug>/index.html   תאריכי החג בשנים הקרובות
+     chagim/<slug>/index.html   תאריכי החג בשנים הקרובות, ובצומות — שעות הצום
+     parasha/index.html         פרשות השבוע ומועד קריאתן
+     parasha/<slug>/index.html  כניסת השבת ויציאתה בשבת שבה הפרשה נקראת
+     chametz/index.html         סוף זמן אכילת חמץ וביעורו, בשלוש שיטות
 
    החישובים נעשים באותם קבצים שהאפליקציה משתמשת בהם (js/*.js), כך שהזמנים
    בדפים זהים לזמנים באפליקציה בהגדרות ברירת המחדל. הדפים תלויים בתאריך,
@@ -23,6 +26,7 @@ var Holidays = require('../js/holidays.js');
 var Cities = require('../js/cities.js');
 var SLUGS = require('./slugs.js');
 var CHAGIM = require('./holidays-info.js');
+var PARASHOT = require('./parashot-info.js');
 
 var ROOT = path.join(__dirname, '..');
 var SITE = 'https://heb-cal.co.il/';
@@ -61,8 +65,14 @@ function write(rel, html) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, html);
 }
-/** מנהג הדלקת הנרות — כמו בבחירת יישוב באפליקציה (js/app.js, setCity) */
-function candleMinutes(city) { return city.name === 'ירושלים' ? 40 : city.name === 'חיפה' ? 30 : 20; }
+/** מנהג הדלקת הנרות — כמו בבחירת יישוב באפליקציה (js/app.js, candleCustom):
+ *  ירושלים 40, חיפה 30, שאר הארץ 20, חו״ל 18 */
+function candleMinutes(city) {
+  return city.name === 'ירושלים' ? 40 : city.name === 'חיפה' ? 30 : city.tz === Cities.IL ? 20 : 18;
+}
+function candleNote(min) {
+  return min + ' דקות לפני השקיעה' + (min === 40 ? ' (מנהג ירושלים)' : min === 30 ? ' (מנהג חיפה)' : '');
+}
 function inIsrael(city) { return city.region === 'ישראל'; }
 /** "ב" לפני שם יישוב: "בירושלים", "בתל אביב–יפו" */
 function inCity(city) { return 'ב' + city.name; }
@@ -115,7 +125,8 @@ function page(o) {
     o.body +
     '</main>\n' +
     '<footer class="wrap foot">' +
-    '<nav><a href="/">לוח שנה עברי</a> · <a href="/zmanim/">זמני היום לפי יישוב</a> · <a href="/chagim/">חגים ומועדים</a></nav>' +
+    '<nav><a href="/">לוח שנה עברי</a> · <a href="/zmanim/">זמני היום לפי יישוב</a> · ' +
+    '<a href="/parasha/">פרשת השבוע</a> · <a href="/chagim/">חגים ומועדים</a></nav>' +
     '<p>הזמנים מחושבים לפי מיקום גאוגרפי. יש לנהוג לחומרא בכמה דקות בכל זמן. עודכן ב־' +
     gregStr(todayH, true) + '.</p>' +
     '</footer>\n' +
@@ -176,7 +187,9 @@ function cityPage(entry) {
     var fri = HDate.make(up.abs - 1), sat = HDate.make(up.abs);
     var zf = Zmanim.compute(fri.date, c, opts), zs = Zmanim.compute(sat.date, c, opts);
     if (!nextShabbat) nextShabbat = { label: up.label, candles: fmt(zf.candles), end: fmt(zs.tzeitShabbat) };
-    shab += '<tr><th scope="row">' + esc(up.label) + '<small>' + esc(hebStr(sat)) + ' · ' +
+    var par = Holidays.parashaForShabbat(up.abs, il);
+    var label = par ? '<a href="/parasha/' + PARASHOT[par.idx][0] + '/">' + esc(up.label) + '</a>' : esc(up.label);
+    shab += '<tr><th scope="row">' + label + '<small>' + esc(hebStr(sat)) + ' · ' +
       esc(gregStr(sat)) + '</small></th><td>' + fmt(zf.candles) + '</td><td>' + fmt(zs.tzeitShabbat) +
       '</td><td>' + fmt(zs.tzeit72) + '</td></tr>';
   }
@@ -194,9 +207,7 @@ function cityPage(entry) {
     '<section><h2>זמני כניסת שבת ויציאתה ' + esc(inCity(c)) + '</h2>' +
     '<div class="card"><table class="t"><thead><tr><th>שבת</th><th>הדלקת נרות</th><th>צאת השבת</th>' +
     '<th>רבנו תם</th></tr></thead><tbody>' + shab + '</tbody></table></div>' +
-    '<p class="note">הדלקת נרות ' + opts.candles + ' דקות לפני השקיעה' +
-    (opts.candles === 40 ? ' (מנהג ירושלים)' : opts.candles === 30 ? ' (מנהג חיפה)' : '') +
-    '. צאת השבת ' + esc(shabOpt.label) + '; רבנו תם — 72 דקות אחרי השקיעה.</p></section>\n' +
+    '<p class="note">הדלקת נרות ' + candleNote(opts.candles) + '. צאת השבת ' + esc(shabOpt.label) + '; רבנו תם — 72 דקות אחרי השקיעה.</p></section>\n' +
 
     '<section><h2>זמני היום ' + esc(inCity(c)) + ' — ' + esc(dayName(todayH)) + ', ' +
     esc(hebStr(todayH)) + '</h2><div class="card">' + full + '</div></section>\n' +
@@ -248,6 +259,52 @@ function citiesIndex() {
   }));
 }
 
+/* ---------- טבלאות לפי ערים ראשיות ---------- */
+var MAIN = ['ירושלים', 'תל אביב–יפו', 'חיפה', 'באר שבע', 'בני ברק', 'פתח תקווה', 'ראשון לציון', 'אשדוד',
+  'נתניה', 'רחובות', 'מודיעין–מכבים–רעות', 'בית שמש', 'אלעד', 'מודיעין עילית', 'ביתר עילית', 'צפת',
+  'טבריה', 'אילת'].map(function (n) {
+  return cities.filter(function (x) { return x.city.name === n; })[0];
+});
+/**
+ * טבלה: שורה לכל עיר ראשית, עמודה לכל זמן.
+ * cols: [[כותרת, function (city, fmt) → Date]]
+ */
+function mainTable(cols) {
+  return '<div class="card"><table class="t"><thead><tr><th>עיר</th>' +
+    cols.map(function (c) { return '<th>' + c[0] + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    MAIN.map(function (x) {
+      var fmt = timeFmt(x.city.tz);
+      return '<tr><th scope="row"><a href="/zmanim/' + x.slug + '/">' + esc(x.city.name) + '</a></th>' +
+        cols.map(function (c) { return '<td>' + fmt(c[1](x.city)) + '</td>'; }).join('') + '</tr>';
+    }).join('') + '</tbody></table></div>';
+}
+function zman(abs, city) { return Zmanim.compute(HDate.make(abs).date, city, { candles: candleMinutes(city) }); }
+var TZEIT_LABEL = Zmanim.findOptById(Zmanim.TZEIT_OPTS, Zmanim.DEFAULTS.tzeit).label;
+var SHAB_LABEL = Zmanim.findOptById(Zmanim.SHABBAT_END_OPTS, Zmanim.DEFAULTS.shabbatEnd).label;
+
+/** שעות הצום לפי ערים. abs = יום הצום עצמו (אחרי דחייה, אם נדחה) */
+function fastSection(chag, abs) {
+  var h = HDate.make(abs), title = esc(chag.name) + ' ' + esc(h.yearHeb), cols, note;
+  if (chag.fast === 'yk') {
+    cols = [['הדלקת נרות', function (c) { return zman(abs - 1, c).candles; }],
+      ['כניסת החג<small>שקיעה</small>', function (c) { return zman(abs - 1, c).sunset; }],
+      ['צאת החג', function (c) { return zman(abs, c).tzeitShabbat; }]];
+    note = 'הצום מתחיל בשקיעה שבערב יום הכיפורים, ונהוג להוסיף עליו מן החול — לכן מקדימים ' +
+      'להפסיק לאכול ולהדליק נרות לפני השקיעה. צאת החג ' + SHAB_LABEL + ', כמו במוצאי שבת.';
+  } else if (chag.fast === 'night') {
+    cols = [['תחילת הצום<small>שקיעה</small>', function (c) { return zman(abs - 1, c).sunset; }],
+      ['סיום הצום', function (c) { return zman(abs, c).tzeit; }]];
+    note = 'הצום מתחיל בשקיעת החמה בערב שלפניו ומסתיים בצאת הכוכבים, ' + TZEIT_LABEL + '.';
+  } else {
+    cols = [['תחילת הצום<small>עלות השחר</small>', function (c) { return zman(abs, c).alot72; }],
+      ['סיום הצום', function (c) { return zman(abs, c).tzeit; }]];
+    note = 'צום קל: מתחיל בעלות השחר (72 דקות לפני הנץ) ומסתיים בצאת הכוכבים, ' + TZEIT_LABEL +
+      '. מותר לאכול לפני עלות השחר רק למי שהתכוון לכך לפני השינה.';
+  }
+  return '<section><h2>שעות ' + title + ' — תחילת הצום וסיומו</h2>' + mainTable(cols) +
+    '<p class="note">' + esc(note) + ' זמנים לשאר היישובים — בדף זמני היום של כל יישוב.</p></section>\n';
+}
+
 /* ---------- דפי חגים ---------- */
 /** מופעי החג מהיום והלאה: [{start, end}] — ימים רצופים הם מופע אחד */
 function occurrences(chag, n) {
@@ -293,14 +350,24 @@ function chagPage(chag, i) {
     '<thead><tr><th>שנה</th><th>תאריך עברי</th><th>תאריך לועזי</th></tr></thead><tbody>' + rows +
     '</tbody></table></div><p class="note">התאריכים לפי לוח ארץ ישראל. מועדים מתחילים בשקיעה של ' +
     'הערב שלפניהם.</p></section>\n' +
+    (chag.fast ? fastSection(chag, next.start) : '') +
+    (chag.slug === 'pesach' ? '<section><h2>סוף זמן אכילת חמץ וביעורו</h2><p><a href="/chametz/">' +
+      'סוף זמן אכילת חמץ ושריפת חמץ ' + esc(nh.yearHeb) + '</a> — בשלוש שיטות, לפי ערים.</p></section>\n' : '') +
     '<section><h2>על ' + esc(chag.name) + '</h2><p>' + esc(chag.text) + '</p></section>\n' +
     '<nav class="pager"><a href="/chagim/' + prev.slug + '/">→ ' + esc(prev.name) + '</a>' +
     '<a href="/chagim/' + nxt.slug + '/">' + esc(nxt.name) + ' ←</a></nav>\n';
 
+  var jeru = MAIN[0].city, fmtJ = timeFmt(jeru.tz);
   write('chagim/' + chag.slug + '/index.html', page({
     url: 'chagim/' + chag.slug + '/',
-    title: 'מתי ' + chag.name + ' ' + nh.gy + '? ' + chag.name + ' ' + nh.yearHeb + ' — תאריכים | לוח עברי',
-    description: chag.name + ' ' + nh.yearHeb + ': ' + nt.greg + ' (' + nt.heb + '). תאריכי ' + chag.name + ' בשנים הקרובות, בעברי ובלועזי, והסבר קצר על המועד.',
+    title: chag.fast
+      ? chag.name + ' ' + nh.yearHeb + ' — מתי, ושעות תחילת הצום וסיומו | לוח עברי'
+      : 'מתי ' + chag.name + ' ' + nh.gy + '? ' + chag.name + ' ' + nh.yearHeb + ' — תאריכים | לוח עברי',
+    description: chag.name + ' ' + nh.yearHeb + ': ' + nt.greg + ' (' + nt.heb + '). ' +
+      (chag.fast
+        ? 'סיום הצום בירושלים ב־' + fmtJ(chag.fast === 'yk' ? zman(next.start, jeru).tzeitShabbat : zman(next.start, jeru).tzeit) +
+          '. שעות תחילת הצום וסיומו בערים המרכזיות.'
+        : 'תאריכי ' + chag.name + ' בשנים הקרובות, בעברי ובלועזי, והסבר קצר על המועד.'),
     crumbs: [['לוח עברי', '/'], ['חגים ומועדים', '/chagim/'], [chag.name, '/chagim/' + chag.slug + '/']],
     appHref: appLink({ date: iso(nh) }),
     appLabel: 'בלוח השנה',
@@ -332,6 +399,147 @@ function chagimIndex(list) {
   }));
 }
 
+/* ---------- פרשות השבוע ---------- */
+/** השבת הקרובה (מהיום) שבה נקראת הפרשה idx, לבדה או מחוברת. בארץ ישראל. */
+function parashaShabbat(idx) {
+  var first = Holidays.upcomingShabbat(TODAY, true).abs;
+  for (var a = first; a < first + 7 * 60; a += 7) {
+    var p = Holidays.parashaForShabbat(a, true);
+    if (p && (p.idx === idx || (p.combined && p.idx + 1 === idx))) return { abs: a, p: p };
+  }
+  return null;
+}
+
+function parashaPage(info, idx) {
+  var name = Holidays.PARSHIOT[idx], slug = info[0];
+  var r = parashaShabbat(idx), abs = r.abs, sat = HDate.make(abs), fri = HDate.make(abs - 1);
+  var full = r.p.combined ? r.p.name : name;
+  var other = r.p.combined ? Holidays.PARSHIOT[r.p.idx === idx ? idx + 1 : idx - 1] : null;
+  var special = Holidays.specialShabbat(sat.hy, sat.hm, sat.hd, true);
+  var jeru = MAIN[0].city, tlv = MAIN[1].city;
+  var zj = zman(abs - 1, jeru), zt = zman(abs - 1, tlv), fmtJ = timeFmt(jeru.tz);
+
+  var table = mainTable([
+    ['הדלקת נרות', function (c) { return zman(abs - 1, c).candles; }],
+    ['צאת השבת', function (c) { return zman(abs, c).tzeitShabbat; }],
+    ['רבנו תם', function (c) { return zman(abs, c).tzeit72; }]
+  ]);
+  var prev = idx > 0 ? PARASHOT[idx - 1] : null, nxt = idx < PARASHOT.length - 1 ? PARASHOT[idx + 1] : null;
+
+  var body =
+    '<h1>פרשת ' + esc(full) + ' ' + esc(sat.yearHeb) + ' — כניסת שבת ויציאתה</h1>\n' +
+    '<p class="lead">פרשת ' + esc(full) + ' נקראת בשבת ' + esc(hebStr(sat, true)) + ', ' + esc(gregStr(sat, true)) +
+    (special ? ' (' + esc(special) + ')' : '') + '. כניסת השבת ביום שישי, ' + esc(gregStr(fri)) + ': בירושלים ' +
+    fmtJ(zj.candles) + ', בתל אביב ' + timeFmt(tlv.tz)(zt.candles) + '. צאת השבת בירושלים ' +
+    fmtJ(zman(abs, jeru).tzeitShabbat) + '.</p>\n' +
+    (other ? '<p class="note">השנה פרשת ' + esc(name) + ' מחוברת לפרשת ' + esc(other) + ' ונקראות יחד.</p>\n' : '') +
+    '<section><h2>זמני כניסת השבת ויציאתה — פרשת ' + esc(full) + '</h2>' + table +
+    '<p class="note">הדלקת נרות 20 דקות לפני השקיעה; בירושלים 40 ובחיפה 30, לפי המנהג. צאת השבת ' +
+    esc(SHAB_LABEL) + '; רבנו תם — 72 דקות אחרי השקיעה. לשאר היישובים — <a href="/zmanim/">זמני היום ' +
+    'לפי יישוב</a>.</p></section>\n' +
+    '<section><h2>על פרשת ' + esc(name) + '</h2><p>' + esc(info[1]) + '</p></section>\n' +
+    '<nav class="pager">' + (prev ? '<a href="/parasha/' + prev[0] + '/">→ פרשת ' + esc(Holidays.PARSHIOT[idx - 1]) + '</a>' : '<span></span>') +
+    (nxt ? '<a href="/parasha/' + nxt[0] + '/">פרשת ' + esc(Holidays.PARSHIOT[idx + 1]) + ' ←</a>' : '') + '</nav>\n';
+
+  write('parasha/' + slug + '/index.html', page({
+    url: 'parasha/' + slug + '/',
+    title: 'כניסת שבת פרשת ' + full + ' ' + sat.yearHeb + ' — זמני הדלקת נרות וצאת השבת | לוח עברי',
+    description: 'פרשת ' + full + ' ' + sat.yearHeb + ', שבת ' + gregStr(sat, true) + ': הדלקת נרות בירושלים ' +
+      fmtJ(zj.candles) + ', צאת השבת ' + fmtJ(zman(abs, jeru).tzeitShabbat) +
+      '. זמני כניסת השבת ויציאתה בכל הערים המרכזיות.',
+    crumbs: [['לוח עברי', '/'], ['פרשת השבוע', '/parasha/'], [name, '/parasha/' + slug + '/']],
+    appHref: appLink({ date: iso(sat) }),
+    appLabel: 'בלוח השנה',
+    body: body
+  }));
+  return { idx: idx, slug: slug, abs: abs, full: full };
+}
+
+function parashaIndex(list) {
+  var cur = Holidays.upcomingShabbat(TODAY, true);
+  var sorted = list.slice().sort(function (a, b) { return a.abs - b.abs || a.idx - b.idx; });
+  var rows = sorted.map(function (x) {
+    var s = HDate.make(x.abs);
+    return '<tr' + (x.abs === cur.abs ? ' class="sh"' : '') + '><th scope="row"><a href="/parasha/' + x.slug + '/">' +
+      esc(Holidays.PARSHIOT[x.idx]) + '</a>' + (x.full !== Holidays.PARSHIOT[x.idx] ? '<small>' + esc(x.full) + '</small>' : '') +
+      '</th><td>' + esc(hebStr(s, true)) + '</td><td>' + esc(gregStr(s, true)) + '</td></tr>';
+  }).join('');
+  var body = '<h1>פרשת השבוע — ' + esc(cur.label) + '</h1>\n' +
+    '<p class="lead">השבת הקרובה: ' + esc(cur.label) + ', ' + esc(gregStr(HDate.make(cur.abs), true)) +
+    '. לכל פרשה — זמני כניסת השבת ויציאתה בשבת שבה היא נקראת, בערים המרכזיות.</p>\n' +
+    '<section><div class="card"><table class="t dates"><thead><tr><th>פרשה</th><th>שבת</th><th>תאריך</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div><p class="note">לפי סדר הקריאה בארץ ישראל.</p></section>\n';
+  write('parasha/index.html', page({
+    url: 'parasha/',
+    title: 'פרשת השבוע ' + cur.label.replace(/^פרשת /, '') + ' — וכל פרשות השנה | לוח עברי',
+    description: 'פרשת השבוע: ' + cur.label + '. מתי נקראת כל פרשה, וזמני כניסת השבת ויציאתה בכל שבת.',
+    crumbs: [['לוח עברי', '/'], ['פרשת השבוע', '/parasha/']],
+    appHref: '/',
+    appLabel: 'לוח השנה',
+    body: body
+  }));
+}
+
+/* ---------- סוף זמן אכילת חמץ ---------- */
+/**
+ * שיטת הגר״מ אליהו (כפי שמחושבת ב־zman.info, ונבדקה מול הזמנים שפורסמו לפסח תשפ״ו
+ * בהפרש של עד דקה): היום ההלכתי מעלות השחר — שעה וחצי זמנית (גר״א) לפני הנץ —
+ * ועד צאת הכוכבים, כשהשמש 6.5 מעלות מתחת לאופק. הנץ והשקיעה בגובה פני הים.
+ */
+function eliyahuHours(abs, city, hours) {
+  var date = HDate.make(abs).date, L = { lat: city.lat, lng: city.lng, elevation: 0 };
+  var sr = Zmanim.sunrise(date, L), ss = Zmanim.sunset(date, L);
+  var alot = new Date(sr.getTime() - 1.5 * (ss - sr) / 12), tzeit = Zmanim.degreesAfter(date, L, 6.5);
+  return new Date(alot.getTime() + (tzeit - alot) / 12 * hours);
+}
+
+function chametzPage() {
+  var hy = todayH.hy;
+  var abs = HDate.hebToAbs(hy, 1, 14);
+  if (abs < TODAY) abs = HDate.hebToAbs(hy + 1, 1, 14);
+  var h = HDate.make(abs), jeru = MAIN[0].city, fmtJ = timeFmt(jeru.tz), zj = zman(abs, jeru);
+  function cols(hours) {
+    return [['גר״א', function (c) { return zman(abs, c).gra(hours); }],
+      ['מגן אברהם', function (c) { return zman(abs, c).mga(hours); }],
+      ['הרב אליהו', function (c) { return eliyahuHours(abs, c, hours); }]];
+  }
+  var shabbat = h.dow === 6;
+  var body =
+    '<h1>סוף זמן אכילת חמץ ושריפת חמץ ' + esc(h.yearHeb) + '</h1>\n' +
+    '<p class="lead">ערב פסח ' + esc(h.yearHeb) + ' חל ב' + esc(HDate.DAY_NAMES_FULL[h.dow]) + ', ' +
+    esc(hebStr(h)) + ' — ' + esc(gregStr(h, true)) + '. בירושלים: סוף זמן אכילת חמץ ' + fmtJ(zj.mga(4)) +
+    ' (מגן אברהם) או ' + fmtJ(zj.gra(4)) + ' (גר״א); סוף זמן ביעור חמץ ' + fmtJ(zj.mga(5)) + ' או ' +
+    fmtJ(zj.gra(5)) + '.</p>\n' +
+    (shabbat ? '<p class="note">השנה ערב פסח חל בשבת: שורפים את החמץ ביום שישי, ובשבת בבוקר מבטלים את ' +
+      'החמץ עד סוף הזמן שבטבלה השנייה.</p>\n' : '') +
+    '<section><h2>סוף זמן אכילת חמץ</h2>' + mainTable(cols(4)) +
+    '<p class="note">סוף השעה הרביעית של היום.</p></section>\n' +
+    '<section><h2>סוף זמן ביעור חמץ</h2>' + mainTable(cols(5)) +
+    '<p class="note">סוף השעה החמישית של היום — עד אז שורפים את החמץ ומבטלים אותו.</p></section>\n' +
+    '<section><h2>השיטות</h2>' +
+    '<p>את היום מחלקים לשתים עשרה «שעות זמניות», והשאלה היא מאיזו נקודה מתחילים לספור:</p>' +
+    '<p><b>הגר״א</b> — מהנץ החמה ועד השקיעה. זה הזמן המאוחר מבין השלושה.</p>' +
+    '<p><b>מגן אברהם</b> — מעלות השחר, 72 דקות לפני הנץ, ועד צאת הכוכבים, 72 דקות אחרי השקיעה. ' +
+    'מוקדם בכרבע שעה עד חצי שעה מהגר״א, ורבים נוהגים להחמיר כמותו בזמני החמץ.</p>' +
+    '<p><b>שיטת הרב מרדכי אליהו</b> — גם היא מעלות השחר ועד צאת הכוכבים, אבל עלות השחר מוקדמת יותר ' +
+    '(שעה וחצי זמנית לפני הנץ) וצאת הכוכבים קרובה לשקיעה (השמש 6.5 מעלות מתחת לאופק). כך השעות ' +
+    'מתחילות מוקדם, והזמן מוקדם בכשלושת רבעי שעה עד שעה מהגר״א — המחמיר מבין השלושה.</p>' +
+    '<p class="note">הזמנים מחושבים בגובה פני הים ומעוגלים כלפי מטה. כדאי לסיים מעט לפני הזמן ' +
+    'שבטבלה, ובכל שאלה לשאול את רב הקהילה.</p></section>\n' +
+    '<nav class="pager"><a href="/chagim/pesach/">→ פסח ' + esc(h.yearHeb) + '</a><span></span></nav>\n';
+
+  write('chametz/index.html', page({
+    url: 'chametz/',
+    title: 'סוף זמן אכילת חמץ ושריפת חמץ ' + h.yearHeb + ' (' + h.gy + ') — לפי ערים | לוח עברי',
+    description: 'ערב פסח ' + h.yearHeb + ', ' + gregStr(h, true) + '. סוף זמן אכילת חמץ בירושלים ' + fmtJ(zj.mga(4)) +
+      ' (מג״א) / ' + fmtJ(zj.gra(4)) + ' (גר״א), וסוף זמן שריפת חמץ — לפי הגר״א, מגן אברהם ושיטת הרב מרדכי אליהו.',
+    crumbs: [['לוח עברי', '/'], ['חגים ומועדים', '/chagim/'], ['פסח', '/chagim/pesach/'], ['סוף זמן חמץ', '/chametz/']],
+    appHref: appLink({ date: iso(h), view: 'zman' }),
+    appLabel: 'בלוח המלא',
+    body: body
+  }));
+}
+
 /* ---------- מפת האתר ---------- */
 function sitemap(urls) {
   write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -345,8 +553,13 @@ function sitemap(urls) {
 cities.forEach(cityPage);
 citiesIndex();
 chagimIndex(CHAGIM.map(chagPage));
+parashaIndex(PARASHOT.map(parashaPage));
+chametzPage();
 sitemap([''].concat(
   ['zmanim/'], cities.map(function (x) { return 'zmanim/' + x.slug + '/'; }),
-  ['chagim/'], CHAGIM.map(function (c) { return 'chagim/' + c.slug + '/'; })
+  ['parasha/'], PARASHOT.map(function (p) { return 'parasha/' + p[0] + '/'; }),
+  ['chagim/'], CHAGIM.map(function (c) { return 'chagim/' + c.slug + '/'; }),
+  ['chametz/']
 ));
-console.log('נוצרו ' + cities.length + ' דפי יישובים ו־' + CHAGIM.length + ' דפי חגים, מתאריך ' + ISO_TODAY);
+console.log('נוצרו ' + cities.length + ' דפי יישובים, ' + PARASHOT.length + ' דפי פרשות ו־' + CHAGIM.length +
+  ' דפי חגים, מתאריך ' + ISO_TODAY);

@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.15.0';
+  var APP_VERSION = '1.16.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -640,7 +640,10 @@
     if (isFast) {
       var startFast = (yk || av9) ? Zmanim.compute(new Date(h.date.getTime() - DAY), loc(), zopts()).sunset : z.alot72;
       extra.push({ label: 'תחילת הצום', note: (yk || av9) ? 'שקיעת החמה אמש' : 'עלות השחר', time: startFast });
-      extra.push({ label: 'סיום הצום', note: Zmanim.findOptById(Zmanim.TZEIT_OPTS, S.tzeit).label, time: z.tzeit });
+      // יום הכיפורים יוצא כמו מוצאי שבת; שאר הצומות — בצאת הכוכבים
+      extra.push(yk
+        ? { label: 'צאת החג', note: Zmanim.findOptById(Zmanim.SHABBAT_END_OPTS, S.shabbatEnd).label, time: z.tzeitShabbat }
+        : { label: 'סיום הצום', note: Zmanim.findOptById(Zmanim.TZEIT_OPTS, S.tzeit).label, time: z.tzeit });
     }
     if (h.hm === 1 && h.hd === 14) {
       extra.push({ label: 'סוף זמן אכילת חמץ', note: 'ארבע שעות — מגן אברהם', time: z.mga(4) });
@@ -891,7 +894,7 @@
       S.alot = DEFAULTS.alot; S.misheyakir = DEFAULTS.misheyakir;
       S.tzeit = DEFAULTS.tzeit; S.shabbatEnd = DEFAULTS.shabbatEnd;
       S.useElevation = DEFAULTS.useElevation;
-      S.candles = S.locName === 'ירושלים' ? 40 : S.locName === 'חיפה' ? 30 : 20;
+      S.candles = candleCustom();
       save(); renderAll();
     });
     m.appendChild(reset);
@@ -1166,6 +1169,14 @@
     });
   }
 
+  /** מנהג הדלקת הנרות המקובל במיקום הנוכחי — נקבע מחדש בכל החלפת יישוב.
+   *  ירושלים 40, חיפה 30, שאר הארץ 20, ובחו״ל 18 כמודפס ברוב הלוחות שם. */
+  function candleCustom() {
+    if (S.locName === 'ירושלים') return 40;
+    if (S.locName === 'חיפה') return 30;
+    return S.tz === 'Asia/Jerusalem' ? 20 : 18;
+  }
+
   function setCity(city) {
     applyCity(city);
     renderAll();
@@ -1173,8 +1184,7 @@
   function applyCity(city) {
     S.locName = city.name; S.lat = city.lat; S.lng = city.lng;
     S.elevation = city.elevation; S.tz = city.tz;
-    // מנהגי הדלקת נרות מקובלים — נקבעים מחדש בכל החלפת יישוב
-    S.candles = city.name === 'ירושלים' ? 40 : city.name === 'חיפה' ? 30 : 20;
+    S.candles = candleCustom();
     S.isGps = false;
     save();
   }
@@ -1188,7 +1198,7 @@
       try { S.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || S.tz; } catch (e) { }
       var near = Cities.nearest(S.lat, S.lng);
       S.locName = (near && near.deg < 0.12) ? near.city.name : 'המיקום שלי';
-      S.candles = S.locName === 'ירושלים' ? 40 : S.locName === 'חיפה' ? 30 : 20;
+      S.candles = candleCustom();
       S.isGps = true;
       save(); renderAll();
     }, function () {

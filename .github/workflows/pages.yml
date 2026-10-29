@@ -15,17 +15,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
       - run: node tools/build-pages.js
       - name: Commit
         run: |
           if git diff --quiet; then echo "אין שינויים"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
-          git add zmanim chagim sitemap.xml
+          git add zmanim chagim parasha chametz sitemap.xml
           git commit -m "עדכון שבועי של הדפים הסטטיים"
           git push
           # דחיפה בשם GITHUB_TOKEN לא תמיד מפעילה בנייה של GitHub Pages — מבקשים אותה במפורש
