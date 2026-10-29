@@ -1,6 +1,6 @@
 /* sw.js — מטמון לעבודה ללא אינטרנט, עם עדכון כפוי בכל טעינה מקוונת.
    כשמתפרסמת גרסה חדשה באתר, המכשיר מקבל אותה מיד — בלי מטמון תקוע. */
-var VERSION = '1.14.4';
+var VERSION = '1.15.0';
 var CACHE = 'luach-' + VERSION;
 var ASSETS = [
   './', 'index.html', 'css/app.css',
@@ -55,6 +55,9 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
+  // הדפים הסטטיים (zmanim/, chagim/) אינם חלק מהאפליקציה: לא שומרים אותם במטמון,
+  // ובוודאי לא במקום index.html — אחרת האפליקציה ללא אינטרנט הייתה נפתחת על דף עיר.
+  if (req.mode === 'navigate' && !/^\/(index\.html)?$/.test(url.pathname)) return;
   var key = req.mode === 'navigate' ? 'index.html' : req;
   e.respondWith(
     fetch(new Request(url.href, { cache: 'no-cache', credentials: 'same-origin' }))
