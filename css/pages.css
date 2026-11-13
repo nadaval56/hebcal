@@ -116,3 +116,35 @@ small { display: block; font-size: 11.5px; font-weight: 400; color: var(--muted)
   border-top: 1px solid var(--line-soft); font-size: 12.5px; color: var(--muted); }
 .foot nav { margin-bottom: 6px; }
 .foot p { margin: 0; }
+
+/* לוח שנה לפי שנה (shana/) */
+main.wide { max-width: 1040px; }
+.months { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; margin-top: 16px; }
+.month { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 12px 8px; }
+.month h3 { margin: 0 2px 8px; font-size: 15px; font-weight: 600; color: var(--ink); display: flex;
+  justify-content: space-between; align-items: baseline; gap: 8px; }
+.month h3 small { display: inline; font-size: 12px; }
+.cal { width: 100%; border-collapse: collapse; table-layout: fixed; text-align: center; }
+.cal th { font-size: 11px; font-weight: 500; color: var(--muted); padding-bottom: 4px; }
+.cal td { padding: 3px 0; border-radius: 8px; line-height: 1.15; }
+.cal td b { display: block; font-size: 14px; font-weight: 600; }
+.cal td small { font-size: 10px; }
+.cal td.sh { background: var(--shabbat); }
+.cal td.ev b { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.cal td.yt b, .cal td.fast b { color: var(--accent); }
+.evs { list-style: none; margin: 8px 0 0; padding: 6px 2px 0; border-top: 1px solid var(--line-soft); font-size: 13px; }
+.evs li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.evs small { display: inline; white-space: nowrap; }
+.years { margin-top: 24px; }
+.print { font: inherit; font-size: 13px; color: var(--accent); background: none; border: 1px solid var(--line);
+  border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+
+@media print {
+  .top, .crumbs, .foot, .years, .print, .pager { display: none !important; }
+  body { background: #fff; color: #000; font-size: 11px; }
+  main.wide { max-width: none; padding: 0; }
+  .months { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .month { break-inside: avoid; padding: 6px; border-color: #ccc; }
+  .cal td b { font-size: 11px; }
+  .evs { font-size: 9.5px; }
+}
