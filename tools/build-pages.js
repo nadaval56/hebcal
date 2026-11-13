@@ -332,24 +332,64 @@ function occText(o) {
   };
 }
 
+/**
+ * ימים טובים בתוך המופע: מתי נכנסים ויוצאים. יום טוב שאחריו שבת יוצא במוצאי
+ * שבת; יום טוב שמתחיל במוצאי שבת — מדליקים אחרי צאת השבת.
+ */
+function yomtovSpans(chag, occ) {
+  return (chag.yomtov || []).map(function (y) {
+    var start = occ.start + y.from, end = occ.start + y.to, last = end;
+    while (HDate.make(end + 1).dow === 6) end++;
+    return { label: y.label, erev: start - 1, end: end, intoShabbat: end !== last,
+      afterShabbat: HDate.make(start - 1).dow === 6 };
+  });
+}
+function candlesFor(span, c) {
+  var z = zman(span.erev, c);
+  return span.afterShabbat ? z.tzeitShabbat : z.candles;
+}
+function yomtovSection(chag, span, year) {
+  var erev = HDate.make(span.erev), end = HDate.make(span.end);
+  var title = span.label ? span.label + ' ' + year : 'כניסת ' + chag.name + ' ' + year + ' ויציאתו';
+  return '<section><h2>' + esc(title) + '</h2>' +
+    '<p class="note">נכנס ב' + esc(HDate.DAY_NAMES_FULL[erev.dow]) + ', ' + esc(gregStr(erev, true)) + ', בערב · ' +
+    'יוצא ב' + esc(HDate.DAY_NAMES_FULL[end.dow]) + ', ' + esc(gregStr(end, true)) + '.</p>' +
+    mainTable([['הדלקת נרות', function (c) { return candlesFor(span, c); }],
+      ['צאת החג', function (c) { return zman(span.end, c).tzeitShabbat; }]]) +
+    '<p class="note">' + (span.afterShabbat
+      ? 'החג מתחיל במוצאי שבת: מדליקים נרות מאש קיימת רק אחרי צאת השבת, בשעה שבטבלה. '
+      : 'הדלקת נרות 20 דקות לפני השקיעה; בירושלים 40 ובחיפה 30, לפי המנהג. ') +
+    'צאת החג ' + esc(SHAB_LABEL) + (span.intoShabbat ? ', במוצאי השבת שאחרי החג' : '') +
+    '.</p></section>\n';
+}
+
 function chagPage(chag, i) {
   var occ = occurrences(chag, OCCURRENCES);
   var next = occ[0], nh = HDate.make(next.start), nt = occText(next);
   var rows = occ.map(function (o) {
     var t = occText(o), s = HDate.make(o.start);
     return '<tr><th scope="row">' + esc(s.yearHeb) + '<small>' + s.gy + '</small></th><td>' + esc(t.heb) +
-      '</td><td>' + esc(t.greg) + '</td></tr>';
+      '</td><td><a href="' + esc(appLink({ date: iso(s), view: 'zman' })) + '">' + esc(t.greg) + '</a></td></tr>';
   }).join('');
+  var spans = yomtovSpans(chag, next), jeru = MAIN[0].city, fmtJ = timeFmt(jeru.tz);
+  var first = spans[0], erevH = first && HDate.make(first.erev);
+  var entry = first ? (chag.slug === 'pesach' ? 'ליל הסדר' : 'כניסת החג') + ': ' +
+    HDate.DAY_NAMES_FULL[erevH.dow] + ', ' + gregStr(erevH, true) + ' בערב' : '';
+  // שאר השנים — כדי שגם חיפוש של שנה אחרת ימצא את התאריך כבר בתיאור
+  var others = occ.slice(1).map(function (o) {
+    return 'ב־' + HDate.make(o.start).gy + ': ' + occText(o).greg.replace(/ \d{4}$/, '');
+  }).join('; ');
   var prev = CHAGIM[(i + CHAGIM.length - 1) % CHAGIM.length], nxt = CHAGIM[(i + 1) % CHAGIM.length];
 
   var body =
     '<h1>' + esc(chag.name) + ' ' + esc(nh.yearHeb) + ' (' + nh.gy + ')</h1>\n' +
     '<p class="lead">' + esc(chag.name) + ' ' + esc(nh.yearHeb) + ': ' + esc(nt.greg) + ' — ' + esc(nt.heb) +
-    '.</p>\n' +
+    '.' + (entry ? ' ' + esc(entry) + ', הדלקת נרות בירושלים ' + fmtJ(candlesFor(first, jeru)) + '.' : '') + '</p>\n' +
     '<section><h2>מתי ' + esc(chag.name) + ' בשנים הקרובות</h2><div class="card"><table class="t dates">' +
     '<thead><tr><th>שנה</th><th>תאריך עברי</th><th>תאריך לועזי</th></tr></thead><tbody>' + rows +
     '</tbody></table></div><p class="note">התאריכים לפי לוח ארץ ישראל. מועדים מתחילים בשקיעה של ' +
-    'הערב שלפניהם.</p></section>\n' +
+    'הערב שלפניהם. לחיצה על תאריך פותחת את זמני היום שלו בלוח.</p></section>\n' +
+    spans.map(function (sp) { return yomtovSection(chag, sp, nh.yearHeb); }).join('') +
     (chag.fast ? fastSection(chag, next.start) : '') +
     (chag.slug === 'pesach' ? '<section><h2>סוף זמן אכילת חמץ וביעורו</h2><p><a href="/chametz/">' +
       'סוף זמן אכילת חמץ ושריפת חמץ ' + esc(nh.yearHeb) + '</a> — בשלוש שיטות, לפי ערים.</p></section>\n' : '') +
@@ -357,17 +397,20 @@ function chagPage(chag, i) {
     '<nav class="pager"><a href="/chagim/' + prev.slug + '/">→ ' + esc(prev.name) + '</a>' +
     '<a href="/chagim/' + nxt.slug + '/">' + esc(nxt.name) + ' ←</a></nav>\n';
 
-  var jeru = MAIN[0].city, fmtJ = timeFmt(jeru.tz);
   write('chagim/' + chag.slug + '/index.html', page({
     url: 'chagim/' + chag.slug + '/',
     title: chag.fast
       ? chag.name + ' ' + nh.yearHeb + ' — מתי, ושעות תחילת הצום וסיומו | לוח עברי'
-      : 'מתי ' + chag.name + ' ' + nh.gy + '? ' + chag.name + ' ' + nh.yearHeb + ' — תאריכים | לוח עברי',
-    description: chag.name + ' ' + nh.yearHeb + ': ' + nt.greg + ' (' + nt.heb + '). ' +
+      : 'מתי ' + chag.name + ' ' + nh.gy + '? ' + chag.name + ' ' + nh.yearHeb + ' — ' +
+        (spans.length ? 'תאריכים וזמני כניסת החג' : 'תאריכים') + ' | לוח עברי',
+    // מתחיל בתשובה לשנה שחיפשו (השנה הקרובה), ואחריה השנים הבאות במפורש
+    description: chag.name + ' ' + nh.gy + ' (' + nh.yearHeb + '): ' + nt.greg + '. ' +
       (chag.fast
         ? 'סיום הצום בירושלים ב־' + fmtJ(chag.fast === 'yk' ? zman(next.start, jeru).tzeitShabbat : zman(next.start, jeru).tzeit) +
-          '. שעות תחילת הצום וסיומו בערים המרכזיות.'
-        : 'תאריכי ' + chag.name + ' בשנים הקרובות, בעברי ובלועזי, והסבר קצר על המועד.'),
+          '. שעות תחילת הצום וסיומו בערים המרכזיות. '
+        : '') +
+      (entry ? entry + ', הדלקת נרות בירושלים ' + fmtJ(candlesFor(first, jeru)) + '. ' : '') +
+      (others ? others + '.' : ''),
     crumbs: [['לוח עברי', '/'], ['חגים ומועדים', '/chagim/'], [chag.name, '/chagim/' + chag.slug + '/']],
     appHref: appLink({ date: iso(nh) }),
     appLabel: 'בלוח השנה',
