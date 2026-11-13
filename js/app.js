@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.16.1';
+  var APP_VERSION = '1.17.0';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var DAY = 86400000;
@@ -514,6 +514,27 @@
     shrinkCells();
   }
 
+  /* קישורים לדפים הסטטיים (פרשה, חג). js/links.js נוצר ב־tools/build-pages.js.
+     בלי הקובץ — למשל במטמון ישן — הטקסט מוצג כרגיל, בלי קישור. */
+  function parashaHref(p) {
+    var L = window.Links;
+    return L && L.parasha[p.idx] ? '/parasha/' + L.parasha[p.idx] + '/' : null;
+  }
+  function chagHref(name) {
+    var L = window.Links;
+    if (!L) return null;
+    for (var i = 0; i < L.chagim.length; i++) {
+      if (new RegExp(L.chagim[i][0]).test(name)) return '/chagim/' + L.chagim[i][1] + '/';
+    }
+    return null;
+  }
+  /** תגית עם קישור כשיש דף מתאים, ובלעדיו — span כמו קודם */
+  function linked(tag, cls, text, href) {
+    return href
+      ? '<a class="' + cls + '" href="' + href + '">' + esc(text) + '</a>'
+      : '<' + tag + ' class="' + cls + '">' + esc(text) + '</' + tag + '>';
+  }
+
   /** גוף כרטיס היום — הכל חוץ משורת הזמנים, שגובהה קבוע */
   function dayCardBody(h, info) {
     // התווית הראשית מוצגת לצד התאריך ולא בשורה נפרדת, כדי לחסוך גובה
@@ -524,15 +545,15 @@
     var rest = lead ? sorted.slice(1) : [];
 
     var meta = '';
-    if (info.parasha) meta += '<div class="dc-par">' + esc('פרשת ' + info.parasha.name) + '</div>';
+    if (info.parasha) meta += linked('div', 'dc-par', 'פרשת ' + info.parasha.name, parashaHref(info.parasha));
     if (lead) {
-      meta += '<div class="dc-holiday' + (lead.kind === 'fast' ? ' fast' : lead.kind === 'yomtov' ? ' yomtov' : '') +
-        '">' + esc(lead.name) + '</div>';
+      meta += linked('div', 'dc-holiday' + (lead.kind === 'fast' ? ' fast' : lead.kind === 'yomtov' ? ' yomtov' : ''),
+        lead.name, chagHref(lead.name));
     }
 
     var tags = [];
     rest.forEach(function (it) {
-      tags.push('<span class="tag' + (it.kind === 'fast' ? ' fast' : '') + '">' + esc(it.name) + '</span>');
+      tags.push(linked('span', 'tag' + (it.kind === 'fast' ? ' fast' : ''), it.name, chagHref(it.name)));
     });
     if (info.special) tags.push('<span class="tag">' + esc(info.special) + '</span>');
     if (info.candles) tags.push('<span class="tag">' + esc(candleText(info.candles)) + '</span>');

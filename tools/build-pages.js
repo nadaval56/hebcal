@@ -8,6 +8,8 @@
      parasha/index.html         פרשות השבוע ומועד קריאתן
      parasha/<slug>/index.html  כניסת השבת ויציאתה בשבת שבה הפרשה נקראת
      chametz/index.html         סוף זמן אכילת חמץ וביעורו, בשלוש שיטות
+     shana/<year>/index.html    לוח שנה שלם — לשנה לועזית (2027) ולשנה עברית (5787)
+     js/links.js                כתובות דפי הפרשות והחגים, לקישורים מכרטיס היום באפליקציה
 
    החישובים נעשים באותם קבצים שהאפליקציה משתמשת בהם (js/*.js), כך שהזמנים
    בדפים זהים לזמנים באפליקציה בהגדרות ברירת המחדל. הדפים תלויים בתאריך,
@@ -120,13 +122,14 @@ function page(o) {
     '<a class="brand" href="/"><img src="/assets/icon.svg" alt="" width="22" height="22">לוח עברי</a>' +
     (o.appHref ? '<a class="open" href="' + esc(o.appHref) + '">' + esc(o.appLabel || 'פתיחה בלוח') + ' ←</a>' : '') +
     '</div></header>\n' +
-    '<main class="wrap">\n' +
+    '<main class="wrap' + (o.wide ? ' wide' : '') + '">\n' +
     '<nav class="crumbs" aria-label="מיקום בדף">' + crumbs + '</nav>\n' +
     o.body +
     '</main>\n' +
     '<footer class="wrap foot">' +
     '<nav><a href="/">לוח שנה עברי</a> · <a href="/zmanim/">זמני היום לפי יישוב</a> · ' +
-    '<a href="/parasha/">פרשת השבוע</a> · <a href="/chagim/">חגים ומועדים</a></nav>' +
+    '<a href="/parasha/">פרשת השבוע</a> · <a href="/chagim/">חגים ומועדים</a> · ' +
+    '<a href="/shana/">לוח שנה לפי שנים</a></nav>' +
     '<p>הזמנים מחושבים לפי מיקום גאוגרפי. יש לנהוג לחומרא בכמה דקות בכל זמן. עודכן ב־' +
     gregStr(todayH, true) + '.</p>' +
     '</footer>\n' +
@@ -583,6 +586,158 @@ function chametzPage() {
   }));
 }
 
+/* ---------- לוח שנה לפי שנה ---------- */
+var GREG_YEARS = [todayH.gy, todayH.gy + 1, todayH.gy + 2];
+var HEB_YEARS = [todayH.hy, todayH.hy + 1];
+
+function chagSlugFor(name) {
+  for (var i = 0; i < CHAGIM.length; i++) if (CHAGIM[i].match.test(name)) return CHAGIM[i].slug;
+  return null;
+}
+/** אירועי החודש, כשימים רצופים של אותו מועד (חנוכה, חול המועד) מתקבצים לשורה אחת */
+function monthEvents(first, count) {
+  var out = [];
+  for (var a = first; a < first + count; a++) {
+    var h = HDate.make(a);
+    Holidays.holidaysFor(h.hy, h.hm, h.hd, true).forEach(function (it) {
+      if (it.kind === 'erev' || it.name === 'אסרו חג') return;
+      var base = it.name.replace(/ — .*$/, '');
+      var prev = out.filter(function (e) { return e.base === base && e.end === a - 1; })[0];
+      if (prev) { prev.end = a; return; }
+      out.push({ base: base, name: base, kind: it.kind, start: a, end: a });
+    });
+  }
+  return out;
+}
+/**
+ * חודש אחד: טבלת שבוע × יום, ומתחתיה רשימת המועדים.
+ * heb=true — חודש עברי (מספר עברי גדול, לועזי קטן); אחרת להפך.
+ */
+function monthBlock(first, count, title, sub, heb) {
+  var kinds = {};
+  monthEvents(first, count).forEach(function (e) {
+    for (var a = e.start; a <= e.end; a++) {
+      if (e.kind === 'yomtov') kinds[a] = 'yt';
+      else if (e.kind === 'fast') kinds[a] = kinds[a] || 'fast';
+      else if (e.kind !== 'roshchodesh') kinds[a] = kinds[a] || 'ev';
+    }
+  });
+  var lead = HDate.make(first).dow, cells = [];
+  for (var i = 0; i < lead; i++) cells.push('<td></td>');
+  for (var a = first; a < first + count; a++) {
+    var h = HDate.make(a), cls = [kinds[a], h.dow === 6 ? 'sh' : ''].filter(Boolean).join(' ');
+    cells.push('<td' + (cls ? ' class="' + cls + '"' : '') + '><b>' + (heb ? esc(h.dayHeb) : h.gd) +
+      '</b><small>' + (heb ? h.gd + '.' + h.gm : esc(h.dayHeb)) + '</small></td>');
+  }
+  while (cells.length % 7) cells.push('<td></td>');
+  var rows = '';
+  for (var r = 0; r < cells.length; r += 7) rows += '<tr>' + cells.slice(r, r + 7).join('') + '</tr>';
+  var evs = monthEvents(first, count).map(function (e) {
+    var s = HDate.make(e.start), en = HDate.make(e.end), slug = chagSlugFor(e.base);
+    var when = heb
+      ? s.dayHebMarks + (e.end > e.start ? '–' + en.dayHebMarks : '') + ' · ' + s.gd + '.' + s.gm
+      : s.gd + (e.end > e.start ? ' עד ' + en.gd + (en.gm !== s.gm ? '.' + en.gm : '') : '') + ' · ' + s.dayHebMarks + ' ' + s.monthName;
+    var name = slug ? '<a href="/chagim/' + slug + '/">' + esc(e.name) + '</a>' : esc(e.name);
+    return '<li><span>' + name + '</span><small>' + esc(when) + '</small></li>';
+  }).join('');
+  return '<div class="month"><h3>' + esc(title) + '<small>' + esc(sub) + '</small></h3>' +
+    '<table class="cal"><thead><tr>' + ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'].map(function (d) {
+      return '<th>' + d + '׳</th>';
+    }).join('') + '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    (evs ? '<ul class="evs">' + evs + '</ul>' : '') + '</div>';
+}
+function hebSpan(first, last) {
+  var a = HDate.make(first), b = HDate.make(last);
+  return a.hm === b.hm ? a.monthName + ' ' + a.yearHeb
+    : a.monthName + (a.hy !== b.hy ? ' ' + a.yearHeb : '') + '–' + b.monthName + ' ' + b.yearHeb;
+}
+var PRINT_BTN = '<button class="print" onclick="print()">הדפסה</button>';
+
+function gregYearPage(gy) {
+  var months = '';
+  for (var m = 1; m <= 12; m++) {
+    var first = HDate.gregToAbs(gy, m, 1), count = new Date(gy, m, 0).getDate();
+    months += monthBlock(first, count, HDate.GREG_MONTHS[m - 1] + ' ' + gy, hebSpan(first, first + count - 1), false);
+  }
+  var hy1 = HDate.make(HDate.gregToAbs(gy, 1, 1)).yearHeb, hy2 = HDate.make(HDate.gregToAbs(gy, 12, 31)).yearHeb;
+  var body = '<h1>לוח שנה ' + gy + ' עברי־לועזי</h1>\n' +
+    '<p class="lead">כל חודשי שנת ' + gy + ' עם התאריך העברי בכל יום (' + esc(hy1) + '–' + esc(hy2) +
+    '), החגים, הצומות וראשי החודשים. שבתות וחגים מסומנים בצבע. ' + PRINT_BTN + '</p>\n' +
+    '<div class="months">' + months + '</div>\n' + yearNav();
+  write('shana/' + gy + '/index.html', page({
+    url: 'shana/' + gy + '/',
+    title: 'לוח שנה ' + gy + ' עברי־לועזי — חגים ומועדים ' + gy + ' | לוח עברי',
+    description: 'לוח שנה ' + gy + ' עם תאריכים עבריים (' + hy1 + '–' + hy2 + '): כל החודשים, החגים, הצומות ' +
+      'וראשי החודשים בשנת ' + gy + '. לצפייה ולהדפסה.',
+    crumbs: [['לוח עברי', '/'], ['לוח שנה', '/shana/'], [String(gy), '/shana/' + gy + '/']],
+    appHref: appLink({ date: gy + '-01-01' }),
+    appLabel: 'בלוח השנה',
+    wide: true,
+    body: body
+  }));
+}
+
+function hebYearPage(hy) {
+  var months = '', n = HDate.monthsInYear(hy);
+  // סדר החודשים בשנה: מתשרי (7) עד אלול (6)
+  for (var k = 0; k < n; k++) {
+    var hm = ((6 + k) % n) + 1;
+    var first = HDate.hebToAbs(hy, hm, 1), count = HDate.daysInMonth(hm, hy);
+    var a = HDate.make(first), b = HDate.make(first + count - 1);
+    var sub = HDate.GREG_MONTHS[a.gm - 1] + (a.gm !== b.gm ? '–' + HDate.GREG_MONTHS[b.gm - 1] : '') + ' ' + b.gy;
+    months += monthBlock(first, count, HDate.monthName(hm, hy) + ' ' + a.yearHeb, sub, true);
+  }
+  var yh = HDate.yearHeb(hy), g1 = HDate.make(HDate.hebToAbs(hy, 7, 1)).gy, g2 = g1 + 1;
+  var body = '<h1>לוח שנה ' + esc(yh) + ' (' + g1 + '–' + g2 + ')</h1>\n' +
+    '<p class="lead">לוח עברי לשנת ' + esc(yh) + ' — ' + (HDate.isLeapYear(hy) ? 'שנה מעוברת, ' + n + ' חודשים' : n + ' חודשים') +
+    ', מתשרי ועד אלול, עם התאריך הלועזי בכל יום, החגים, הצומות וראשי החודשים. ' + PRINT_BTN + '</p>\n' +
+    '<div class="months">' + months + '</div>\n' + yearNav();
+  write('shana/' + hy + '/index.html', page({
+    url: 'shana/' + hy + '/',
+    title: 'לוח שנה ' + yh + ' — לוח עברי ' + g1 + '–' + g2 + ' עם חגים | לוח עברי',
+    description: 'לוח שנה ' + yh + ' (' + g1 + '–' + g2 + '): כל חודשי השנה העברית מתשרי עד אלול, עם תאריכים ' +
+      'לועזיים, חגים, צומות וראשי חודשים. לצפייה ולהדפסה.',
+    crumbs: [['לוח עברי', '/'], ['לוח שנה', '/shana/'], [yh, '/shana/' + hy + '/']],
+    appHref: appLink({ date: iso(HDate.make(HDate.hebToAbs(hy, 7, 1))) }),
+    appLabel: 'בלוח השנה',
+    wide: true,
+    body: body
+  }));
+}
+
+function yearNav() {
+  return '<nav class="chips years">' +
+    GREG_YEARS.map(function (y) { return '<a href="/shana/' + y + '/">לוח שנה ' + y + '</a>'; }).join('') +
+    HEB_YEARS.map(function (y) { return '<a href="/shana/' + y + '/">לוח שנה ' + esc(HDate.yearHeb(y)) + '</a>'; }).join('') +
+    '</nav>\n';
+}
+
+function yearsIndex() {
+  var body = '<h1>לוח שנה עברי־לועזי לפי שנים</h1>\n' +
+    '<p class="lead">לוח שנה מלא לכל שנה — לפי השנה הלועזית (ינואר עד דצמבר) או לפי השנה העברית ' +
+    '(תשרי עד אלול), עם החגים, הצומות וראשי החודשים.</p>\n' + yearNav();
+  write('shana/index.html', page({
+    url: 'shana/',
+    title: 'לוח שנה עברי־לועזי ' + todayH.gy + ', ' + (todayH.gy + 1) + ' ו־' + todayH.yearHeb + ' | לוח עברי',
+    description: 'לוח שנה ' + todayH.gy + ', ' + (todayH.gy + 1) + ', ' + todayH.yearHeb + ' ו־' +
+      HDate.yearHeb(todayH.hy + 1) + ' — כל החודשים עם תאריכים עבריים ולועזיים, חגים וצומות.',
+    crumbs: [['לוח עברי', '/'], ['לוח שנה', '/shana/']],
+    appHref: '/',
+    appLabel: 'לוח השנה',
+    body: body
+  }));
+}
+
+/* ---------- קישורים מהאפליקציה ---------- */
+function linksFile() {
+  write('js/links.js', '/* links.js — נוצר אוטומטית ב־tools/build-pages.js; לא לערוך ידנית.\n' +
+    '   כתובות דפי הפרשות (לפי Holidays.PARSHIOT) והחגים (ביטוי לשם האירוע ← כתובת). */\n' +
+    'var Links = ' + JSON.stringify({
+      parasha: PARASHOT.map(function (p) { return p[0]; }),
+      chagim: CHAGIM.map(function (c) { return [c.match.source, c.slug]; })
+    }) + ';\n');
+}
+
 /* ---------- מפת האתר ---------- */
 function sitemap(urls) {
   write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -598,11 +753,16 @@ citiesIndex();
 chagimIndex(CHAGIM.map(chagPage));
 parashaIndex(PARASHOT.map(parashaPage));
 chametzPage();
+GREG_YEARS.forEach(gregYearPage);
+HEB_YEARS.forEach(hebYearPage);
+yearsIndex();
+linksFile();
 sitemap([''].concat(
   ['zmanim/'], cities.map(function (x) { return 'zmanim/' + x.slug + '/'; }),
   ['parasha/'], PARASHOT.map(function (p) { return 'parasha/' + p[0] + '/'; }),
   ['chagim/'], CHAGIM.map(function (c) { return 'chagim/' + c.slug + '/'; }),
-  ['chametz/']
+  ['chametz/'],
+  ['shana/'], GREG_YEARS.concat(HEB_YEARS).map(function (y) { return 'shana/' + y + '/'; })
 ));
 console.log('נוצרו ' + cities.length + ' דפי יישובים, ' + PARASHOT.length + ' דפי פרשות ו־' + CHAGIM.length +
   ' דפי חגים, מתאריך ' + ISO_TODAY);
